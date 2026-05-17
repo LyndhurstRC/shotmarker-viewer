@@ -178,6 +178,19 @@
     position: absolute; bottom: 7px; left: 10px;
     font-size: 11px; color: rgba(255,255,255,0.4); pointer-events: none;
   }
+  #theme-controls {
+    position: absolute; bottom: 8px; right: 8px;
+    display: flex; gap: 5px; align-items: center;
+  }
+  .theme-btn {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: rgba(0,0,0,0.45); border: 2px solid rgba(255,255,255,0.2);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 10px; color: #8c8c8c;
+    transition: border-color 0.15s;
+  }
+  .theme-btn.active { border-color: var(--accent); }
+  .theme-btn:hover { border-color: rgba(255,255,255,0.5); }
 
   /* SHOT DETAIL */
   #shot-detail {
@@ -235,7 +248,7 @@
   <div class="logo">S</div>
   <div>
     <div class="title">Shotmarker Viewer</div>
-    <div class="sub">Offline backup viewer</div>
+    <div class="sub">Offline Plot Data</div>
   </div>
   <div style="margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:4px">
     <div style="display:flex;gap:6px;align-items:center">
@@ -256,6 +269,7 @@
       </a>
     </div>
     <div id="open-filename" style="display:none;font-size:11px;color:var(--muted);text-align:right;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+    <div style="font-size:11px;color:var(--accent);text-align:right;font-weight:500">Lyndhurst Rifle Club 2026 — JG</div>
   </div>
 </header>
 
@@ -335,6 +349,14 @@
         <div class="zoom-btn" onclick="changeZoom(1.5)">+</div>
         <div class="zoom-btn" onclick="changeZoom(1/1.5)">−</div>
         <div class="zoom-btn" style="font-size:14px;font-weight:600" onclick="resetZoom()">⊡</div>
+        <div class="zoom-btn" style="font-size:15px" onclick="saveImage()" title="Save image">💾</div>
+      </div>
+      <div id="theme-controls">
+        <div class="theme-btn active" onclick="setTheme('shotmarker',this)" title="Shotmarker Grey">⬤</div>
+        <div class="theme-btn" onclick="setTheme('paper',this)" title="Paper" style="color:#c8b060">⬤</div>
+        <div class="theme-btn" onclick="setTheme('dark',this)" title="High Contrast Dark" style="color:#444">⬤</div>
+        <div class="theme-btn" onclick="setTheme('green',this)" title="Night Vision" style="color:#00bb55">⬤</div>
+        <div class="theme-btn" onclick="setTheme('steel',this)" title="Blue Steel" style="color:#4488bb">⬤</div>
       </div>
       <div id="zoom-label">Pinch to zoom · drag to pan · tap shot</div>
     </div>
@@ -619,32 +641,63 @@ function renderScoreStrip() {
     grid.appendChild(cell);
   });
 }
-// ── Target ring definitions — exact boundaries from shot data (max radius per zone) ──
+// ── Target ring definitions — official ICFRA dimensions (radii in mm) ─────────
+// Source: ICFRA Rule Book Appendix D3. Dimensions are diameters ÷ 2.
+// Zones: X/V = Super V, 6/V = Central Bull, 5 = Inner, 4 = Magpie, 3 = Outer, 2 = Hit
+// Imperial yards
 const RINGS = {
-  'ISLR':   { r:[135, 261, 409, 561, 912, 962], l:['V','5','4','3','2','1'] },
-  'IS600y': { r:[ 76, 149, 289, 442, 507, 882], l:['V','5','4','3','2','1'] },
-  'IS500y': { r:[ 68, 128, 145, 220, 310, 400], l:['V','5','4','3','2','1'] },
-  'IS500m': { r:[ 75, 148, 331, 484, 560, 640], l:['V','5','4','3','2','1'] },
-  'IS300m': { r:[ 39,  70, 134, 189, 293, 505], l:['V','5','4','3','2','1'] },
-  'IFX600y':{ r:[ 40,  75, 142, 289, 434, 850], l:['X','6','5','4','3','2'] },
-  'IFX600m':{ r:[ 42,  81, 163, 288, 407, 500], l:['X','6','5','4','3','2'] },
-  'IFX500y':{ r:[ 36,  69, 134, 275, 340, 420], l:['X','6','5','4','3','2'] },
-  'IFX500m':{ r:[ 40,  76, 137, 230, 340, 430], l:['X','6','5','4','3','2'] },
-  'IFX300m':{ r:[ 21,  39,  71, 129, 180, 240], l:['X','6','5','4','3','2'] },
-  'IFXLR':  { r:[ 66, 130, 255, 360, 543, 695], l:['X','6','5','4','3','2'] },
-  'UKTR300':{ r:[ 45,  72,  89, 209, 400, 626], l:['V','5','4','3','2','1'] },
+  'ISLR':   { r:[ 64, 128, 255, 408, 560, 660], l:['V','5','4','3','2','1'] }, // 1000y
+  'IS600y': { r:[ 36,  73, 145, 300, 458, 660], l:['V','5','4','3','2','1'] }, // 600y
+  'IS500y': { r:[ 33,  65, 130, 300, 458, 660], l:['V','5','4','3','2','1'] }, // 500y
+  'IS300m': { r:[ 18,  35,  70, 140, 210, 300], l:['V','5','4','3','2','1'] }, // 300m
+  'IS500m': { r:[ 36,  73, 145, 330, 500, 660], l:['V','5','4','3','2','1'] }, // 500m
+  'IS600y': { r:[ 36,  73, 145, 300, 458, 660], l:['V','5','4','3','2','1'] }, // 600y = 700y spec
+  // F-Class: X = Super V (half diameter of Central Bull), 6 = Central Bull
+  'IFX300m':{ r:[ 18,  35,  70, 140, 210, 300], l:['X','6','5','4','3','2'] }, // 300m
+  'IFX500m':{ r:[ 36,  73, 145, 330, 500, 660], l:['X','6','5','4','3','2'] }, // 500m
+  'IFX500y':{ r:[ 33,  65, 130, 300, 458, 660], l:['X','6','5','4','3','2'] }, // 500y
+  'IFX600m':{ r:[ 40,  80, 160, 330, 500, 660], l:['X','6','5','4','3','2'] }, // 600m
+  'IFX600y':{ r:[ 36,  73, 145, 300, 458, 660], l:['X','6','5','4','3','2'] }, // 600y
+  'IFXLR':  { r:[ 64, 128, 255, 408, 560, 660], l:['X','6','5','4','3','2'] }, // 900m/1000y
+  'UKTR300':{ r:[ 18,  35,  70, 140, 210, 300], l:['V','5','4','3','2','1'] }, // 300m
 };
 
-// Shotmarker colour palette (matched from screenshot)
-const C_TARGET = '#8c8c8c';           // mid-grey target background
-const C_RING   = '#ffffff';           // white ring lines
-const C_LABEL  = 'rgba(255,255,255,0.40)'; // faint label text
-const C_DOT    = '#1e1e1e';           // near-black shot dot fill
-const C_DOT_S  = '#3a3a3a';          // dot outline
-const C_NUM    = '#ffffff';           // white number in dot
-const C_SIGHT  = '#4a4a4a';          // sighter dot fill
-const C_SIGHT_L= 'rgba(200,200,200,0.8)'; // sighter number colour
-const C_HL     = '#f5c518';           // yellow highlight ring
+// ── Colour themes ─────────────────────────────────────────────────────────────
+const THEMES = {
+  shotmarker: {
+    target: '#8c8c8c', ring: '#ffffff', label: 'rgba(255,255,255,0.40)',
+    dot: '#1e1e1e', dotS: '#3a3a3a', num: '#ffffff',
+    sight: '#4a4a4a', sightL: 'rgba(200,200,200,0.8)', hl: '#f5c518', bg: '#111'
+  },
+  paper: {
+    target: '#e8e0d0', ring: '#2a1a0a', label: 'rgba(0,0,0,0.30)',
+    dot: '#1a0a00', dotS: '#5a3a20', num: '#e8e0d0',
+    sight: '#8a7a60', sightL: 'rgba(80,60,40,0.8)', hl: '#c8901a', bg: '#c8b89a'
+  },
+  dark: {
+    target: '#1a1a1a', ring: '#ffffff', label: 'rgba(255,255,255,0.35)',
+    dot: '#ffffff', dotS: '#aaaaaa', num: '#000000',
+    sight: '#666666', sightL: 'rgba(180,180,180,0.8)', hl: '#f5c518', bg: '#000'
+  },
+  green: {
+    target: '#0a1a0a', ring: '#00dd66', label: 'rgba(0,220,100,0.40)',
+    dot: '#001a00', dotS: '#00aa44', num: '#00ff88',
+    sight: '#1a3a1a', sightL: 'rgba(0,200,80,0.7)', hl: '#f5c518', bg: '#050f05'
+  },
+  steel: {
+    target: '#1e2d3d', ring: '#a0c8e8', label: 'rgba(160,200,230,0.40)',
+    dot: '#0a1520', dotS: '#2a4a6a', num: '#c8e0f0',
+    sight: '#1a3a5a', sightL: 'rgba(120,180,220,0.8)', hl: '#f5c518', bg: '#0f1820'
+  },
+};
+let currentTheme = THEMES.shotmarker;
+
+function setTheme(name, el) {
+  currentTheme = THEMES[name];
+  document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  drawTarget();
+}
 
 // ── Draw target ───────────────────────────────────────────────────────────────
 function drawTarget() {
@@ -668,7 +721,7 @@ function drawTarget() {
   const cx0 = W/2, cy0 = H/2;
 
   // Clear
-  ctx.fillStyle = '#111';
+  ctx.fillStyle = currentTheme.bg;
   ctx.fillRect(0,0,W,H);
 
   const cx = cx0, cy = cy0;
@@ -683,13 +736,10 @@ function drawTarget() {
   const allPts = [...currentShots, ...currentSighters].filter(s => s.x != null);
   let autoZoom = 1;
   if (allPts.length > 0 && zoom === 1 && panX === 0 && panY === 0) {
-    // Find bounding box of all shots
     const maxX = Math.max(...allPts.map(s => Math.abs(s.x)));
     const maxY = Math.max(...allPts.map(s => Math.abs(s.y)));
-    // Outermost extent in any direction + small padding (1.5x dot radius in mm)
-    const DOT_MM = 15; // approximate dot size in mm for padding
+    const DOT_MM = 15;
     const outerExtent = Math.max(maxX, maxY) + DOT_MM * 3;
-    // Scale so outerExtent fills 45% of canvas (radius)
     const fitSc = (W * 0.45) / outerExtent;
     autoZoom = Math.max(1, Math.min(fitSc / baseSc, 14));
   }
@@ -703,11 +753,11 @@ function drawTarget() {
   ctx.translate(-cx0, -cy0);
 
   // Grey target face
-  ctx.fillStyle = C_TARGET;
+  ctx.fillStyle = currentTheme.target;
   ctx.fillRect(cx - tw*sc/2, cy - th*sc/2, tw*sc, th*sc);
 
   // Rings
-  ctx.strokeStyle = C_RING;
+  ctx.strokeStyle = currentTheme.ring;
   ctx.lineWidth = Math.max(1.2, sc * 1.5) / effectiveZoom;
   ring.r.forEach(mm => {
     ctx.beginPath();
@@ -718,7 +768,7 @@ function drawTarget() {
   // Ring labels
   const lfs = Math.max(11, Math.round(sc * 17)) / effectiveZoom;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillStyle = C_LABEL;
+  ctx.fillStyle = currentTheme.label;
   for (let i = ring.r.length-1; i >= 1; i--) {
     const rOuter = ring.r[i]*sc, rInner = ring.r[i-1]*sc;
     const mid = (rOuter + rInner) / 2;
@@ -728,32 +778,32 @@ function drawTarget() {
   // Innermost label (V or X)
   const r0 = ring.r[0]*sc;
   ctx.font = `bold ${Math.max(10, Math.round(r0*0.55)) / effectiveZoom}px -apple-system,sans-serif`;
-  ctx.fillStyle = 'rgba(255,255,255,0.50)';
+  ctx.fillStyle = currentTheme.label;
   ctx.fillText(ring.l[0], cx, cy);
 
-  // Dot radius — constant apparent size regardless of zoom
+  // Dot radius
   const DOT = Math.max(7, Math.round(disp/58)) / effectiveZoom;
-  const nfs  = Math.max(4, DOT * 0.58);  // smaller numbers
+  const nfs = DOT * 1.2;
 
-  // Sighters (drawn first, behind scored shots)
+  // Sighters
   currentSighters.forEach((s,i) => {
     if (s.x==null) return;
     const lbl = s.display_text != null ? String(s.display_text) : `S${i+1}`;
-    dot(ctx, cx+s.x*sc, cy-s.y*sc, DOT, C_SIGHT, '#666', lbl, nfs, C_SIGHT_L);
+    dot(ctx, cx+s.x*sc, cy-s.y*sc, DOT, currentTheme.sight, currentTheme.dotS, lbl, nfs, currentTheme.sightL);
   });
 
-  // Scored shots — use display_text (S1, S2, 1, 2...) from Shotmarker
+  // Scored shots
   currentShots.forEach((s,i) => {
     if (s.x==null) return;
     const sx = cx+s.x*sc, sy = cy-s.y*sc;
     if (i === selectedShot) {
       ctx.beginPath();
       ctx.arc(sx, sy, DOT + Math.max(3.5, DOT*0.6), 0, Math.PI*2);
-      ctx.fillStyle = C_HL;
+      ctx.fillStyle = currentTheme.hl;
       ctx.fill();
     }
     const lbl = s.display_text != null ? String(s.display_text) : String(i+1);
-    dot(ctx, sx, sy, DOT, C_DOT, C_DOT_S, lbl, nfs, C_NUM);
+    dot(ctx, sx, sy, DOT, currentTheme.dot, currentTheme.dotS, lbl, nfs, currentTheme.num);
   });
 
   ctx.restore();
@@ -768,7 +818,134 @@ function dot(ctx, x, y, r, fill, stroke, lbl, fs, lc) {
   ctx.fillText(lbl, x, y);
 }
 
-// ── Zoom & pan ────────────────────────────────────────────────────────────────
+// ── Save image ────────────────────────────────────────────────────────────────
+function saveImage() {
+  if (!currentMeta) return;
+  const meta = currentMeta;
+  const shots = currentShots;
+
+  // Get the target canvas
+  const targetCanvas = document.getElementById('target-canvas');
+  const cw = targetCanvas.width;
+  const ch = targetCanvas.height;
+  const dpr = window.devicePixelRatio || 1;
+  const dispW = cw / dpr;
+
+  // Create composite canvas: header info + target plot
+  const PAD = Math.round(dispW * 0.04);
+  const HEADER_H = Math.round(dispW * 0.22);
+  const out = document.createElement('canvas');
+  out.width  = cw;
+  out.height = ch + HEADER_H * dpr;
+  const ctx = out.getContext('2d');
+
+  // Background
+  ctx.fillStyle = '#1c1c1e';
+  ctx.fillRect(0, 0, out.width, out.height);
+
+  // ── Header section ──
+  ctx.save();
+  ctx.scale(dpr, dpr);
+
+  // Session name
+  ctx.fillStyle = '#f2f2f7';
+  ctx.font = `bold ${Math.round(dispW * 0.055)}px -apple-system, sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText(meta.name || 'Unnamed', PAD, PAD);
+
+  // Target info line
+  ctx.fillStyle = '#8e8e93';
+  ctx.font = `${Math.round(dispW * 0.034)}px -apple-system, sans-serif`;
+  ctx.fillText(`${meta.target_name}  ·  ${meta.dist}  ·  ${meta.dateStr} ${meta.time}`, PAD, PAD + Math.round(dispW * 0.065));
+
+  // Score total
+  let numeric = 0, xCount = 0, vCount = 0;
+  shots.forEach(s => {
+    const sc = String(s.score ?? '');
+    if (sc === 'X') { numeric += 6; xCount++; }
+    else if (sc === 'V') { numeric += 5; vCount++; }
+    else { numeric += parseInt(sc) || 0; }
+  });
+  let totalStr = String(numeric);
+  if (xCount > 0) totalStr += `-${xCount}X`;
+  else if (vCount > 0) totalStr += `-${vCount}V`;
+
+  ctx.fillStyle = '#e8a020';
+  ctx.font = `bold ${Math.round(dispW * 0.075)}px -apple-system, sans-serif`;
+  ctx.textAlign = 'right';
+  ctx.fillText(totalStr, dispW - PAD, PAD);
+
+  // Velocity stats
+  const vels = shots.filter(s => s.v && s.v > 0).map(s => s.v);
+  if (vels.length > 1) {
+    const avg = vels.reduce((a,b)=>a+b,0)/vels.length;
+    const sd = Math.sqrt(vels.map(v=>(v-avg)**2).reduce((a,b)=>a+b,0)/vels.length);
+    ctx.fillStyle = '#5b8dee';
+    ctx.font = `${Math.round(dispW * 0.034)}px -apple-system, sans-serif`;
+    ctx.fillText(`avg ${Math.round(avg)} fps  SD ${sd.toFixed(1)}`, dispW - PAD, PAD + Math.round(dispW * 0.065));
+  }
+
+  // Score sequence
+  const seqY = PAD + Math.round(dispW * 0.13);
+  const cellW = Math.round(dispW * 0.042);
+  const cellH = Math.round(dispW * 0.050);
+  let sx = PAD;
+  shots.forEach((s, i) => {
+    const lbl = s.display_text != null ? String(s.display_text) : String(i+1);
+    const sc  = String(s.score ?? '?');
+    // Cell background
+    ctx.fillStyle = i === selectedShot ? '#e8a020' : '#3a3a3c';
+    roundRect(ctx, sx, seqY, cellW, cellH, 3);
+    ctx.fill();
+    // Number above
+    ctx.fillStyle = i === selectedShot ? '#000' : '#8e8e93';
+    ctx.font = `${Math.round(cellW * 0.38)}px -apple-system, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(lbl, sx + cellW/2, seqY + 2);
+    // Score
+    ctx.fillStyle = i === selectedShot ? '#000' : '#f2f2f7';
+    ctx.font = `bold ${Math.round(cellW * 0.52)}px -apple-system, sans-serif`;
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(sc, sx + cellW/2, seqY + cellH - 2);
+    sx += cellW + 3;
+    if (sx + cellW > dispW - PAD) { sx = PAD; }
+  });
+
+  // Club watermark
+  ctx.fillStyle = 'rgba(232,160,32,0.5)';
+  ctx.font = `${Math.round(dispW * 0.028)}px -apple-system, sans-serif`;
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText('Lyndhurst Rifle Club 2026 — JG', dispW - PAD, HEADER_H - 6);
+
+  ctx.restore();
+
+  // ── Draw target plot below header ──
+  ctx.drawImage(targetCanvas, 0, HEADER_H * dpr);
+
+  // ── Download ──
+  const fname = `${(meta.name||'session').replace(/\s+/g,'-')}_${meta.dateStr.replace(/\s+/g,'-')}.png`;
+  const link = document.createElement('a');
+  link.download = fname;
+  link.href = out.toDataURL('image/png');
+  link.click();
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.lineTo(x+w-r, y);
+  ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+  ctx.lineTo(x+w, y+h-r);
+  ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+  ctx.lineTo(x+r, y+h);
+  ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+  ctx.lineTo(x, y+r);
+  ctx.quadraticCurveTo(x, y, x+r, y);
+  ctx.closePath();
+}
 function changeZoom(f) {
   zoom = Math.min(Math.max(zoom*f, 1), 14);
   if (zoom===1) { panX=0; panY=0; }
