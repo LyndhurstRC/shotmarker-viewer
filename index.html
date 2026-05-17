@@ -224,21 +224,26 @@
     <div class="title">Shotmarker Viewer</div>
     <div class="sub">Offline backup viewer</div>
   </div>
-  <label style="margin-left:auto">
-    <span id="btn-reload" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:6px 12px;font-size:13px;cursor:pointer;white-space:nowrap">⟳ New backup</span>
-    <input type="file" id="file-input-hdr" accept=".tar" style="display:none">
-  </label>
-  <a id="drive-link-hdr" href="https://drive.google.com/drive/folders/16ziDZMijxlZAigotp-WxkjOVgWUoZRvt?usp=sharing" target="_blank" class="drive-btn-small" style="display:none">
-    <svg width="14" height="14" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
-      <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#fff"/>
-      <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#fff"/>
-      <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#fff"/>
-      <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#fff"/>
-      <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#fff"/>
-      <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 27h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#fff"/>
-    </svg>
-    Backups
-  </a>
+  <div style="margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+    <div style="display:flex;gap:6px;align-items:center">
+      <label>
+        <span id="btn-reload" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:6px 12px;font-size:13px;cursor:pointer;white-space:nowrap">⬇ Downloads</span>
+        <input type="file" id="file-input-hdr" accept=".tar" style="display:none">
+      </label>
+      <a id="drive-link-hdr" href="https://drive.google.com/drive/folders/16ziDZMijxlZAigotp-WxkjOVgWUoZRvt?usp=sharing" target="_blank" class="drive-btn-small" style="display:none">
+        <svg width="14" height="14" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
+          <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#fff"/>
+          <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#fff"/>
+          <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#fff"/>
+          <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#fff"/>
+          <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#fff"/>
+          <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 27h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#fff"/>
+        </svg>
+        Google Drive
+      </a>
+    </div>
+    <div id="open-filename" style="display:none;font-size:11px;color:var(--muted);text-align:right;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+  </div>
 </header>
 
 <div id="load-screen">
@@ -391,6 +396,9 @@ async function loadTar(file) {
   document.getElementById('app').style.display = 'flex';
   document.getElementById('btn-reload').style.display = 'inline-block';
   document.getElementById('drive-link-hdr').style.display = '';
+  const fnEl = document.getElementById('open-filename');
+  fnEl.textContent = '📂 ' + file.name;
+  fnEl.style.display = 'block';
   buildDistFilters();
   filterSessions();
 }
