@@ -250,24 +250,32 @@
       <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
       <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 27h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
     </svg>
-    Step 1 — Open Backup Drive Folder
+    Step 1 — Open LyndhurstRC Drive Folder
   </a>
 
   <div class="how-to">
     <h3>How to view a session</h3>
     <ol>
-      <li>Tap <strong>Open Backup Drive Folder</strong> above and download the backup file <span>(.tar)</span> you want to view</li>
-      <li>Come back to this page and tap the target below</li>
-      <li>Select the downloaded <span>.tar</span> file from your Downloads folder</li>
+      <li>Tap <strong>Step 1</strong> above — the LyndhurstRC Drive folder will open in a new tab</li>
+      <li>Find the backup file you want to view <span>(.tar)</span> and <strong>download it</strong> — don't just open it
+        <br><span>On Android: press and hold the file → tap Download · On iPhone/iPad: tap the file → tap the share icon → Save to Files</span>
+      </li>
+      <li>Switch back to this tab and tap <strong>Step 2</strong> below</li>
+      <li>Navigate to your <strong>Downloads</strong> folder and select the <span>.tar</span> file you just downloaded</li>
     </ol>
   </div>
 
   <!-- Step 2: Load the file -->
-  <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+  <div class="drop-zone" id="drop-zone">
     <div class="icon">🎯</div>
     <h2>Step 2 — Load Backup File</h2>
     <p>Tap here to select your downloaded<br><strong>SM_backup_*.tar</strong> file</p>
-    <input type="file" id="file-input" accept=".tar">
+    <label for="file-input" style="display:block;margin-top:14px">
+      <span style="background:var(--accent);color:#000;font-weight:700;padding:10px 24px;border-radius:8px;font-size:14px;cursor:pointer;display:inline-block">
+        Select File
+      </span>
+    </label>
+    <input type="file" id="file-input" accept=".tar" style="display:none">
   </div>
   <div id="load-progress"></div>
 </div>
