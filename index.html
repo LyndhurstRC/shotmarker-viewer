@@ -275,6 +275,7 @@
 
 <div id="load-screen">
 
+
   <!-- Step 1: Get the backup file -->
   <a id="drive-link" href="https://drive.google.com/drive/folders/16ziDZMijxlZAigotp-WxkjOVgWUoZRvt?usp=sharing" target="_blank" class="drive-btn">
     <svg width="20" height="20" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
@@ -311,6 +312,9 @@
     <input type="file" id="file-input" accept=".tar" style="position:absolute;left:-9999px;opacity:0;">
   </div>
   <div id="load-progress"></div>
+  <div style="font-size:12px;color:#8e8e93;text-align:center;max-width:420px;line-height:1.5;padding:0 20px;margin-top:8px">
+    ⚠️ Plots are generated from uncorrected Shotmarker coordinate data. Shot positions may not exactly match the recorded score zone due to acoustic measurement artefacts.
+  </div>
 </div>
 
 <div id="app">
@@ -651,9 +655,6 @@ function renderScoreStrip() {
 // IS targets: V ring = central bull (superV scores same as V)
 // IFX targets: X = superV ring, 6 = central bull
 // ── Official ICFRA target ring radii (mm from centre) ────────────────────────
-// Source: ICFRA Rule Book Appendix D3, diameter/2
-// IS targets:  [V, 5, 4, 3, 2, 1]
-// IFX targets: [X, 6, 5, 4, 3, 2]
 const OFFICIAL_RINGS = {
   'IS300m':  { r:[ 35,   70,  140,  210,  300,  600], l:['V','5','4','3','2','1'] },
   'IS500m':  { r:[ 72.5, 145, 330,  500,  660,  900], l:['V','5','4','3','2','1'] },
@@ -670,8 +671,29 @@ const OFFICIAL_RINGS = {
   'IFXLR':   { r:[ 63.5,127.5,255, 407.5, 560,  915], l:['X','6','5','4','3','2'] },
 };
 
+// Calculate sc (pixels per mm) by finding the official ring that contains
+// the outermost shot, then scaling so that ring fills 85% of canvas.
+// Rings drawn at official mm radii * sc — shots plotted at x/y mm * sc.
+// Both use identical sc so they are always consistent.
 function getTargetDef(faceId) {
   return OFFICIAL_RINGS[faceId] || null;
+}
+
+function calcScale(faceId, allShots, canvasW, zoom) {
+  const td = getTargetDef(faceId);
+  if (!td || allShots.length === 0) return { sc: 1, displayR: 500, td };
+
+  const maxR = Math.max(...allShots.map(s => Math.sqrt(s.x*s.x + s.y*s.y)));
+
+  // Find the first official ring boundary >= maxR
+  // This ring contains all shots — scale so it fills 85% of canvas
+  let displayR = td.r[td.r.length - 1];
+  for (let i = 0; i < td.r.length; i++) {
+    if (td.r[i] >= maxR) { displayR = td.r[i]; break; }
+  }
+
+  const sc = (canvasW * 0.425 / displayR) * zoom;
+  return { sc, displayR, td };
 }
 
 // ── Colour themes ─────────────────────────────────────────────────────────────
@@ -712,24 +734,10 @@ function drawTarget() {
   ctx.fillStyle = currentTheme.bg;
   ctx.fillRect(0, 0, W, W);
 
-  // Get official ICFRA target dimensions for this face type
-  const td = getTargetDef(currentMeta.face_id);
-  if (!td) { ctx.fillStyle='#888'; ctx.font='20px sans-serif'; ctx.textAlign='center'; ctx.fillText('Unknown target: '+currentMeta.face_id, W/2, W/2); ctx.restore(); return; }
-
+  // Get ring boundaries from this session's score data
   const allShots = [...currentShots, ...currentSighters].filter(s => s.x != null);
-
-  // Find the smallest official ring that contains ALL shots
-  // Scale so that ring fills 85% of canvas
-  let displayR = td.r[td.r.length - 1];
-  if (allShots.length > 0) {
-    const maxR = Math.max(...allShots.map(s => Math.sqrt(s.x*s.x + s.y*s.y)));
-    for (let i = 0; i < td.r.length; i++) {
-      if (td.r[i] >= maxR) { displayR = td.r[i]; break; }
-    }
-  }
-
-  // sc = pixels per mm. SAME value used for rings AND shots.
-  const sc = (W * 0.425 / displayR) * zoom;
+  const { sc, displayR, td } = calcScale(currentMeta.face_id, allShots, W, zoom);
+  if (!td) { ctx.restore(); return; }
 
   const cx = W / 2 + panX;
   const cy = W / 2 + panY;
@@ -1011,17 +1019,9 @@ function handleTap(clientX, clientY) {
   if (!currentId || !currentShots.length) return;
   const rect = CV.getBoundingClientRect();
   const disp = rect.width;
-  const td = getTargetDef(currentMeta.face_id);
+  const allShots2 = [...currentShots, ...currentSighters].filter(s => s.x != null);
+  const { sc, td } = calcScale(currentMeta.face_id, allShots2, disp, zoom);
   if (!td) return;
-  const allShots = [...currentShots, ...currentSighters].filter(s => s.x != null);
-  let displayR = td.r[td.r.length - 1];
-  if (allShots.length > 0) {
-    const maxR = Math.max(...allShots.map(s => Math.sqrt(s.x*s.x + s.y*s.y)));
-    for (let i = 0; i < td.r.length; i++) {
-      if (td.r[i] >= maxR) { displayR = td.r[i]; break; }
-    }
-  }
-  const sc = (disp * 0.425 / displayR) * zoom;
   const cx = disp / 2 + panX;
   const cy = disp / 2 + panY;
   const ox = clientX - rect.left;
