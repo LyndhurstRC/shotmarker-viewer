@@ -610,7 +610,10 @@ function renderScoreStrip() {
   shots.forEach((s, i) => {
     const cell = document.createElement('div');
     cell.className = 'ss-cell' + (i === selectedShot ? ' hl' : '');
-    cell.textContent = String(s.score ?? '?');
+    cell.innerHTML = `<span style="font-size:9px;font-weight:400;opacity:0.6;line-height:1">${i+1}</span><span style="line-height:1">${String(s.score ?? '?')}</span>`;
+    cell.style.flexDirection = 'column';
+    cell.style.gap = '1px';
+    cell.style.height = '36px';
     cell.title = `Shot ${i+1}`;
     cell.onclick = () => highlightShot(i);
     grid.appendChild(cell);
