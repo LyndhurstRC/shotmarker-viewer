@@ -291,8 +291,10 @@
     <div class="icon">🎯</div>
     <h2>Step 2 — Load Backup File</h2>
     <p>Tap the button below to select your downloaded<br><strong>SM_backup_*.tar</strong> file</p>
-    <input type="file" id="file-input" accept=".tar"
-      style="display:block;margin:16px auto 0;font-size:14px;color:var(--text);background:var(--accent);border:none;border-radius:8px;padding:10px 20px;cursor:pointer;font-weight:700;color:#000;width:100%;max-width:260px;">
+    <label for="file-input" style="display:inline-block;margin-top:16px;background:var(--accent);color:#000;font-weight:700;padding:10px 28px;border-radius:8px;font-size:14px;cursor:pointer;">
+      Select File
+    </label>
+    <input type="file" id="file-input" accept=".tar" style="position:absolute;left:-9999px;opacity:0;">
   </div>
   <div id="load-progress"></div>
 </div>
@@ -539,12 +541,6 @@ function openSession(id) {
 // ── Session info panel ────────────────────────────────────────────────────────
 function renderInfo() {
   const meta = currentMeta, shots = currentShots;
-  const tally = {};
-  shots.forEach(s => { const sc = String(s.score??'?'); tally[sc]=(tally[sc]||0)+1; });
-  const keys = ['X','V','6','5','4','3','2','1','0'];
-  const scoreHTML = keys.filter(k=>tally[k]).map(k =>
-    `<div class="stat"><div class="val" style="font-size:15px">${tally[k]}</div><div class="lbl"><span class="sc-pill">${k}</span></div></div>`
-  ).join('');
   const vels = shots.filter(s=>s.v&&s.v>0).map(s=>s.v);
   let velHTML = '';
   if (vels.length>1) {
@@ -561,7 +557,7 @@ function renderInfo() {
     <div class="info-sub">${meta.target_name} · ${meta.dist} · ${meta.dateStr} ${meta.time}</div>
     <div class="stats-row">
       <div class="stat"><div class="val val-gold">${shots.length}</div><div class="lbl">Shots</div></div>
-      ${scoreHTML}${velHTML}
+      ${velHTML}
     </div>`;
 }
 
@@ -603,35 +599,40 @@ function renderScoreStrip() {
   sighters.forEach((s, i) => {
     const cell = document.createElement('div');
     cell.className = 'ss-cell sighter';
-    cell.textContent = `S${i+1}`;
+    cell.style.flexDirection = 'column';
+    cell.style.gap = '1px';
+    cell.style.height = '36px';
+    cell.innerHTML = `<span style="font-size:9px;font-weight:400;opacity:0.6;line-height:1">S${i+1}</span><span style="line-height:1">—</span>`;
     cell.title = `Sighter ${i+1}`;
     grid.appendChild(cell);
   });
   shots.forEach((s, i) => {
     const cell = document.createElement('div');
     cell.className = 'ss-cell' + (i === selectedShot ? ' hl' : '');
-    cell.innerHTML = `<span style="font-size:9px;font-weight:400;opacity:0.6;line-height:1">${i+1}</span><span style="line-height:1">${String(s.score ?? '?')}</span>`;
+    const lbl = s.display_text != null ? String(s.display_text) : String(i+1);
+    cell.innerHTML = `<span style="font-size:9px;font-weight:400;opacity:0.6;line-height:1">${lbl}</span><span style="line-height:1">${String(s.score ?? '?')}</span>`;
     cell.style.flexDirection = 'column';
     cell.style.gap = '1px';
     cell.style.height = '36px';
-    cell.title = `Shot ${i+1}`;
+    cell.title = `Shot ${lbl}`;
     cell.onclick = () => highlightShot(i);
     grid.appendChild(cell);
   });
 }
+// ── Target ring definitions — exact boundaries from shot data (max radius per zone) ──
 const RINGS = {
-  'ISLR':   { r:[55,100,155,220,290,365], l:['V','5','4','3','2','1'] },
-  'IS600y': { r:[40, 80,125,180,240,305], l:['V','5','4','3','2','1'] },
-  'IS500y': { r:[40, 75,115,165,220,280], l:['V','5','4','3','2','1'] },
-  'IS500m': { r:[40, 75,115,165,220,280], l:['V','5','4','3','2','1'] },
-  'IS300m': { r:[30, 60, 90,130,170,215], l:['V','5','4','3','2','1'] },
-  'IFX600y':{ r:[25, 65,115,170,235,305], l:['X','6','5','4','3','2'] },
-  'IFX600m':{ r:[25, 60,105,160,220,285], l:['X','6','5','4','3','2'] },
-  'IFX500y':{ r:[25, 60,100,150,210,270], l:['X','6','5','4','3','2'] },
-  'IFX500m':{ r:[25, 55, 95,145,200,260], l:['X','6','5','4','3','2'] },
-  'IFX300m':{ r:[20, 48, 82,122,170,220], l:['X','6','5','4','3','2'] },
-  'IFXLR':  { r:[25, 60,105,160,220,285], l:['X','6','5','4','3','2'] },
-  'UKTR300':{ r:[25, 55, 90,130,175,220], l:['V','5','4','3','2','1'] },
+  'ISLR':   { r:[135, 261, 409, 561, 912, 962], l:['V','5','4','3','2','1'] },
+  'IS600y': { r:[ 76, 149, 289, 442, 507, 882], l:['V','5','4','3','2','1'] },
+  'IS500y': { r:[ 68, 128, 145, 220, 310, 400], l:['V','5','4','3','2','1'] },
+  'IS500m': { r:[ 75, 148, 331, 484, 560, 640], l:['V','5','4','3','2','1'] },
+  'IS300m': { r:[ 39,  70, 134, 189, 293, 505], l:['V','5','4','3','2','1'] },
+  'IFX600y':{ r:[ 40,  75, 142, 289, 434, 850], l:['X','6','5','4','3','2'] },
+  'IFX600m':{ r:[ 42,  81, 163, 288, 407, 500], l:['X','6','5','4','3','2'] },
+  'IFX500y':{ r:[ 36,  69, 134, 275, 340, 420], l:['X','6','5','4','3','2'] },
+  'IFX500m':{ r:[ 40,  76, 137, 230, 340, 430], l:['X','6','5','4','3','2'] },
+  'IFX300m':{ r:[ 21,  39,  71, 129, 180, 240], l:['X','6','5','4','3','2'] },
+  'IFXLR':  { r:[ 66, 130, 255, 360, 543, 695], l:['X','6','5','4','3','2'] },
+  'UKTR300':{ r:[ 45,  72,  89, 209, 400, 626], l:['V','5','4','3','2','1'] },
 };
 
 // Shotmarker colour palette (matched from screenshot)
@@ -670,24 +671,44 @@ function drawTarget() {
   ctx.fillStyle = '#111';
   ctx.fillRect(0,0,W,H);
 
-  // Apply zoom & pan
-  ctx.translate(cx0 + panX, cy0 + panY);
-  ctx.scale(zoom, zoom);
-  ctx.translate(-cx0, -cy0);
-
   const cx = cx0, cy = cy0;
   const tw = data.width  || 1800;
   const th = data.height || 1800;
-  const sc = (W * 0.90) / Math.max(tw, th);  // mm → pixels
+  const ring = RINGS[currentMeta.face_id] || RINGS['ISLR'];
+
+  // Base scale: fit full target face
+  const baseSc = (W * 0.90) / Math.max(tw, th);
+
+  // Auto-fit: zoom as tight as possible around all shots with small padding
+  const allPts = [...currentShots, ...currentSighters].filter(s => s.x != null);
+  let autoZoom = 1;
+  if (allPts.length > 0 && zoom === 1 && panX === 0 && panY === 0) {
+    // Find bounding box of all shots
+    const maxX = Math.max(...allPts.map(s => Math.abs(s.x)));
+    const maxY = Math.max(...allPts.map(s => Math.abs(s.y)));
+    // Outermost extent in any direction + small padding (1.5x dot radius in mm)
+    const DOT_MM = 15; // approximate dot size in mm for padding
+    const outerExtent = Math.max(maxX, maxY) + DOT_MM * 3;
+    // Scale so outerExtent fills 45% of canvas (radius)
+    const fitSc = (W * 0.45) / outerExtent;
+    autoZoom = Math.max(1, Math.min(fitSc / baseSc, 14));
+  }
+
+  const effectiveZoom = (zoom === 1 && panX === 0 && panY === 0) ? autoZoom : zoom;
+  const sc = baseSc;
+
+  // Apply zoom & pan
+  ctx.translate(cx0 + panX, cy0 + panY);
+  ctx.scale(effectiveZoom, effectiveZoom);
+  ctx.translate(-cx0, -cy0);
 
   // Grey target face
   ctx.fillStyle = C_TARGET;
   ctx.fillRect(cx - tw*sc/2, cy - th*sc/2, tw*sc, th*sc);
 
   // Rings
-  const ring = RINGS[currentMeta.face_id] || RINGS['ISLR'];
   ctx.strokeStyle = C_RING;
-  ctx.lineWidth = Math.max(1.2, sc * 1.5);
+  ctx.lineWidth = Math.max(1.2, sc * 1.5) / effectiveZoom;
   ring.r.forEach(mm => {
     ctx.beginPath();
     ctx.arc(cx, cy, mm*sc, 0, Math.PI*2);
@@ -695,7 +716,7 @@ function drawTarget() {
   });
 
   // Ring labels
-  const lfs = Math.max(11, Math.round(sc * 17));
+  const lfs = Math.max(11, Math.round(sc * 17)) / effectiveZoom;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillStyle = C_LABEL;
   for (let i = ring.r.length-1; i >= 1; i--) {
@@ -706,21 +727,22 @@ function drawTarget() {
   }
   // Innermost label (V or X)
   const r0 = ring.r[0]*sc;
-  ctx.font = `bold ${Math.max(10, Math.round(r0*0.55))}px -apple-system,sans-serif`;
+  ctx.font = `bold ${Math.max(10, Math.round(r0*0.55)) / effectiveZoom}px -apple-system,sans-serif`;
   ctx.fillStyle = 'rgba(255,255,255,0.50)';
   ctx.fillText(ring.l[0], cx, cy);
 
   // Dot radius — constant apparent size regardless of zoom
-  const DOT = Math.max(7, Math.round(disp/58)) / zoom;
-  const nfs  = Math.max(6, DOT * 0.85);
+  const DOT = Math.max(7, Math.round(disp/58)) / effectiveZoom;
+  const nfs  = Math.max(4, DOT * 0.58);  // smaller numbers
 
   // Sighters (drawn first, behind scored shots)
   currentSighters.forEach((s,i) => {
     if (s.x==null) return;
-    dot(ctx, cx+s.x*sc, cy-s.y*sc, DOT, C_SIGHT, '#666', `S${i+1}`, nfs, C_SIGHT_L);
+    const lbl = s.display_text != null ? String(s.display_text) : `S${i+1}`;
+    dot(ctx, cx+s.x*sc, cy-s.y*sc, DOT, C_SIGHT, '#666', lbl, nfs, C_SIGHT_L);
   });
 
-  // Scored shots
+  // Scored shots — use display_text (S1, S2, 1, 2...) from Shotmarker
   currentShots.forEach((s,i) => {
     if (s.x==null) return;
     const sx = cx+s.x*sc, sy = cy-s.y*sc;
@@ -730,7 +752,8 @@ function drawTarget() {
       ctx.fillStyle = C_HL;
       ctx.fill();
     }
-    dot(ctx, sx, sy, DOT, C_DOT, C_DOT_S, String(i+1), nfs, C_NUM);
+    const lbl = s.display_text != null ? String(s.display_text) : String(i+1);
+    dot(ctx, sx, sy, DOT, C_DOT, C_DOT_S, lbl, nfs, C_NUM);
   });
 
   ctx.restore();
@@ -810,6 +833,23 @@ function pdist(e) {
   return Math.sqrt(dx*dx+dy*dy);
 }
 
+function getEffectiveZoom() {
+  if (zoom !== 1 || panX !== 0 || panY !== 0) return zoom;
+  if (!currentMeta || !currentShots.length) return zoom;
+  const data = shotData[currentId];
+  const disp = getCanvasDisp();
+  const tw = data.width || 1800, th = data.height || 1800;
+  const baseSc = (disp * 0.90) / Math.max(tw, th);
+  const allPts = [...currentShots, ...currentSighters].filter(s => s.x != null);
+  if (!allPts.length) return 1;
+  const maxX = Math.max(...allPts.map(s => Math.abs(s.x)));
+  const maxY = Math.max(...allPts.map(s => Math.abs(s.y)));
+  const DOT_MM = 15;
+  const outerExtent = Math.max(maxX, maxY) + DOT_MM * 3;
+  const fitSc = (disp * 0.45) / outerExtent;
+  return Math.max(1, Math.min(fitSc / baseSc, 14));
+}
+
 function handleTap(cx, cy) {
   if (!currentId || !currentShots.length) return;
   const data = shotData[currentId];
@@ -818,11 +858,12 @@ function handleTap(cx, cy) {
   const sc   = (disp*0.90)/Math.max(data.width||1800, data.height||1800);
   const ox   = cx - rect.left, oy = cy - rect.top;
   const cx0  = disp/2, cy0 = disp/2;
+  const ez   = getEffectiveZoom();
   // Map from screen → canvas space (undo zoom+pan)
-  const mx = (ox - cx0 - panX) / zoom + cx0;
-  const my = (oy - cy0 - panY) / zoom + cy0;
+  const mx = (ox - cx0 - panX) / ez + cx0;
+  const my = (oy - cy0 - panY) / ez + cy0;
   const DOT = Math.max(7, Math.round(disp/58));
-  const hitR = Math.max(20, DOT*2.8) / zoom;
+  const hitR = Math.max(20, DOT*2.8) / ez;
 
   let found = -1;
   for (let i=currentShots.length-1; i>=0; i--) {
@@ -866,8 +907,9 @@ function renderTable() {
   const shots=currentShots, sighters=currentSighters;
   let html = shots.map((s,i) => {
     const sc=String(s.score??'?');
+    const lbl = s.display_text != null ? String(s.display_text) : String(i+1);
     return `<tr onclick="highlightShot(${i})">
-      <td style="color:var(--muted);font-weight:600">${i+1}</td>
+      <td style="color:var(--muted);font-weight:600">${lbl}</td>
       <td><span class="sc-pill">${sc}</span></td>
       <td>${s.x!=null?s.x.toFixed(1):'-'}</td>
       <td>${s.y!=null?s.y.toFixed(1):'-'}</td>
@@ -875,13 +917,16 @@ function renderTable() {
     </tr>`;
   }).join('');
   if (sighters.length) {
-    html += sighters.map((s,i) => `<tr style="opacity:0.5">
-      <td style="color:var(--muted)">S${i+1}</td>
-      <td><span class="sc-pill" style="background:#444">—</span></td>
-      <td>${s.x!=null?s.x.toFixed(1):'-'}</td>
-      <td>${s.y!=null?s.y.toFixed(1):'-'}</td>
-      <td>${s.v?Math.round(s.v):'-'}</td>
-    </tr>`).join('');
+    html += sighters.map((s,i) => {
+      const lbl = s.display_text != null ? String(s.display_text) : `S${i+1}`;
+      return `<tr style="opacity:0.5">
+        <td style="color:var(--muted)">${lbl}</td>
+        <td><span class="sc-pill" style="background:#444">—</span></td>
+        <td>${s.x!=null?s.x.toFixed(1):'-'}</td>
+        <td>${s.y!=null?s.y.toFixed(1):'-'}</td>
+        <td>${s.v?Math.round(s.v):'-'}</td>
+      </tr>`;
+    }).join('');
   }
   document.getElementById('shot-tbody').innerHTML = html;
 }
