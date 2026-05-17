@@ -350,25 +350,35 @@ dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag
 
 async function loadTar(file) {
   prog('Reading file…');
+  console.log('Loading file:', file.name, 'size:', file.size);
   const bytes = new Uint8Array(await file.arrayBuffer());
   prog('Parsing archive…'); await tick();
   const files = parseTar(bytes);
+  console.log('Files found in tar:', Object.keys(files).length, Object.keys(files).slice(0,5));
   prog('Loading sessions…'); await tick();
 
   let archive = {};
-  if (files['archive.txt']) { try { archive = JSON.parse(dec(files['archive.txt'])); } catch(e){} }
+  if (files['archive.txt']) {
+    try {
+      archive = JSON.parse(dec(files['archive.txt']));
+      console.log('Archive entries:', Object.keys(archive).length);
+    } catch(e) { console.error('archive.txt parse error:', e); }
+  } else {
+    console.error('archive.txt NOT FOUND in tar. Keys:', Object.keys(files).slice(0,10));
+  }
 
   sessions = []; shotData = {}; allDistances = new Set();
+  let skipped = 0;
 
   for (const id of Object.keys(archive)) {
     const meta = archive[id];
     const fname = `string-${id}.z`;
-    if (!files[fname]) continue;
+    if (!files[fname]) { skipped++; continue; }
     let parsed;
-    try { parsed = JSON.parse(dec(pako.inflate(files[fname]))); } catch(e) { continue; }
+    try { parsed = JSON.parse(dec(pako.inflate(files[fname]))); } catch(e) { console.error('parse error', fname, e); continue; }
     const shots = parsed.shots || [];
     const sighters = parsed.shots_invalid || [];
-    if (shots.length === 0 && sighters.length === 0) continue;
+    if (shots.length === 0 && sighters.length === 0) { skipped++; continue; }
     const dateStr = new Date(parseInt(id)).toLocaleDateString('en-AU', { day:'2-digit', month:'short', year:'numeric' });
     const dist = String(meta.distance);
     allDistances.add(dist);
@@ -376,6 +386,7 @@ async function loadTar(file) {
     shotData[id] = parsed;
   }
 
+  console.log('Sessions loaded:', sessions.length, 'Skipped:', skipped);
   sessions.sort((a,b) => b.ts - a.ts);
   prog('');
   document.getElementById('load-screen').style.display = 'none';
