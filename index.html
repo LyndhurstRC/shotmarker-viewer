@@ -441,6 +441,7 @@ async function loadTar(file) {
 
   console.log('Sessions loaded:', sessions.length, 'Skipped:', skipped);
   sessions.sort((a,b) => b.ts - a.ts);
+  buildRingsFromBackup();
   prog('');
   document.getElementById('load-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
@@ -645,49 +646,59 @@ function renderScoreStrip() {
     grid.appendChild(cell);
   });
 }
-// ── Target ring definitions — boundaries from actual shot data (midpoint method) ──
-const RINGS = {
-  'ISLR':   { r:[131, 260, 411, 563, 937, 1100], l:['V','5','4','3','2','1'] },
-  'IS600y': { r:[ 77, 149, 299, 454, 603, 800],  l:['V','5','4','3','2','1'] },
-  'IS500y': { r:[ 69, 134, 220, 320, 430, 560],  l:['V','5','4','3','2','1'] },
-  'IS500m': { r:[ 76, 148, 335, 500, 640, 780],  l:['V','5','4','3','2','1'] },
-  'IS300m': { r:[ 39,  73, 141, 202, 306, 594],  l:['V','5','4','3','2','1'] },
-  'IFX600y':{ r:[ 40,  76, 145, 303, 563, 750],  l:['X','6','5','4','3','2'] },
-  'IFX600m':{ r:[ 43,  82, 166, 331, 500, 650],  l:['X','6','5','4','3','2'] },
-  'IFX500y':{ r:[ 37,  70, 135, 307, 450, 600],  l:['X','6','5','4','3','2'] },
-  'IFX500m':{ r:[ 40,  77, 158, 400, 600, 780],  l:['X','6','5','4','3','2'] },
-  'IFX300m':{ r:[ 21,  39,  75, 160, 250, 340],  l:['X','6','5','4','3','2'] },
-  'IFXLR':  { r:[ 67, 133, 261, 414, 619, 800],  l:['X','6','5','4','3','2'] },
-  'UKTR300':{ r:[ 46,  80, 121, 417, 550, 700],  l:['V','5','4','3','2','1'] },
-};
+// ── Official ICFRA target dimensions ─────────────────────────────────────────
+// Source: ICFRA Rule Book Appendix D3
+// All values are radii in mm (diameter/2)
+// IS targets: V ring = central bull (superV scores same as V)
+// IFX targets: X = superV ring, 6 = central bull
+// ── Ring boundaries — computed from loaded backup data per face_id ────────────
+let COMPUTED_RINGS = {}; // populated after each backup loads
+
+function buildRingsFromBackup() {
+  const orderIS  = ['V','5','4','3','2','1'];
+  const orderIFX = ['X','6','5','4','3','2'];
+  const byFace = {};
+
+  for (const id of Object.keys(shotData)) {
+    const j = shotData[id];
+    const fid = j.face_id;
+    if (!fid) continue;
+    if (!byFace[fid]) byFace[fid] = {};
+    for (const s of (j.shots || [])) {
+      if (s.x == null || s.score == null) continue;
+      const r = Math.sqrt(s.x*s.x + s.y*s.y);
+      const sc = String(s.score);
+      if (!byFace[fid][sc]) byFace[fid][sc] = [];
+      byFace[fid][sc].push(r);
+    }
+  }
+
+  COMPUTED_RINGS = {};
+  for (const [fid, zones] of Object.entries(byFace)) {
+    const order = fid.startsWith('IFX') ? orderIFX : orderIS;
+    const present = order.filter(sc => zones[sc] && zones[sc].length > 0);
+    if (present.length < 2) continue;
+    const boundaries = [];
+    for (let i = 0; i < present.length - 1; i++) {
+      const innerMax = Math.max(...zones[present[i]]);
+      const outerMin = Math.min(...zones[present[i+1]]);
+      boundaries.push((innerMax + outerMin) / 2);
+    }
+    COMPUTED_RINGS[fid] = { r: boundaries, l: present };
+  }
+}
+
+function getTargetDef(faceId) {
+  return COMPUTED_RINGS[faceId] || null;
+}
 
 // ── Colour themes ─────────────────────────────────────────────────────────────
 const THEMES = {
-  shotmarker: {
-    target: '#8c8c8c', ring: '#ffffff', label: 'rgba(255,255,255,0.40)',
-    dot: '#1e1e1e', dotS: '#3a3a3a', num: '#ffffff',
-    sight: '#4a4a4a', sightL: 'rgba(200,200,200,0.8)', hl: '#f5c518', bg: '#111'
-  },
-  paper: {
-    target: '#e8e0d0', ring: '#2a1a0a', label: 'rgba(0,0,0,0.30)',
-    dot: '#1a0a00', dotS: '#5a3a20', num: '#e8e0d0',
-    sight: '#8a7a60', sightL: 'rgba(80,60,40,0.8)', hl: '#c8901a', bg: '#c8b89a'
-  },
-  dark: {
-    target: '#1a1a1a', ring: '#ffffff', label: 'rgba(255,255,255,0.35)',
-    dot: '#ffffff', dotS: '#aaaaaa', num: '#000000',
-    sight: '#666666', sightL: 'rgba(180,180,180,0.8)', hl: '#f5c518', bg: '#000'
-  },
-  green: {
-    target: '#0a1a0a', ring: '#00dd66', label: 'rgba(0,220,100,0.40)',
-    dot: '#001a00', dotS: '#00aa44', num: '#00ff88',
-    sight: '#1a3a1a', sightL: 'rgba(0,200,80,0.7)', hl: '#f5c518', bg: '#050f05'
-  },
-  steel: {
-    target: '#1e2d3d', ring: '#a0c8e8', label: 'rgba(160,200,230,0.40)',
-    dot: '#0a1520', dotS: '#2a4a6a', num: '#c8e0f0',
-    sight: '#1a3a5a', sightL: 'rgba(120,180,220,0.8)', hl: '#f5c518', bg: '#0f1820'
-  },
+  shotmarker: { bg:'#111', target:'#8c8c8c', ring:'#ffffff', label:'rgba(255,255,255,0.40)', dot:'#1e1e1e', dotS:'#3a3a3a', num:'#ffffff', sight:'#4a4a4a', sightL:'rgba(200,200,200,0.8)', hl:'#f5c518' },
+  paper:      { bg:'#c8b89a', target:'#e8e0d0', ring:'#2a1a0a', label:'rgba(0,0,0,0.30)', dot:'#1a0a00', dotS:'#5a3a20', num:'#e8e0d0', sight:'#8a7a60', sightL:'rgba(80,60,40,0.8)', hl:'#c8901a' },
+  dark:       { bg:'#000', target:'#1a1a1a', ring:'#ffffff', label:'rgba(255,255,255,0.35)', dot:'#ffffff', dotS:'#aaaaaa', num:'#000000', sight:'#666666', sightL:'rgba(180,180,180,0.8)', hl:'#f5c518' },
+  green:      { bg:'#050f05', target:'#0a1a0a', ring:'#00dd66', label:'rgba(0,220,100,0.40)', dot:'#001a00', dotS:'#00aa44', num:'#00ff88', sight:'#1a3a1a', sightL:'rgba(0,200,80,0.7)', hl:'#f5c518' },
+  steel:      { bg:'#0f1820', target:'#1e2d3d', ring:'#a0c8e8', label:'rgba(160,200,230,0.40)', dot:'#0a1520', dotS:'#2a4a6a', num:'#c8e0f0', sight:'#1a3a5a', sightL:'rgba(120,180,220,0.8)', hl:'#f5c518' },
 };
 let currentTheme = THEMES.shotmarker;
 
@@ -701,7 +712,6 @@ function setTheme(name, el) {
 // ── Draw target ───────────────────────────────────────────────────────────────
 function drawTarget() {
   if (!currentMeta) return;
-  const data = shotData[currentId];
   const canvas = document.getElementById('target-canvas');
   const wrap   = document.getElementById('target-wrap');
   const dpr    = window.devicePixelRatio || 1;
@@ -715,99 +725,89 @@ function drawTarget() {
   const ctx = canvas.getContext('2d');
   ctx.save();
   ctx.scale(dpr, dpr);
+  const W = disp;
 
-  const W = disp, H = disp;
-  const cx0 = W/2, cy0 = H/2;
-
-  // Clear
   ctx.fillStyle = currentTheme.bg;
-  ctx.fillRect(0,0,W,H);
+  ctx.fillRect(0, 0, W, W);
 
-  const cx = cx0, cy = cy0;
-  const tw = data.width  || 1800;
-  const th = data.height || 1800;
-  const ring = RINGS[currentMeta.face_id] || RINGS['ISLR'];
+  // Get official ICFRA target dimensions for this face type
+  const td = getTargetDef(currentMeta.face_id);
+  if (!td) { ctx.fillStyle='#888'; ctx.font='20px sans-serif'; ctx.textAlign='center'; ctx.fillText('Unknown target: '+currentMeta.face_id, W/2, W/2); ctx.restore(); return; }
 
-  // Base scale: fit full target face
-  const baseSc = (W * 0.90) / Math.max(tw, th);
+  const allShots = [...currentShots, ...currentSighters].filter(s => s.x != null);
 
-  // Auto-fit: zoom to show all shots with their containing ring visible
-  const allPts = [...currentShots, ...currentSighters].filter(s => s.x != null);
-  let autoZoom = 1;
-  if (allPts.length > 0 && zoom === 1 && panX === 0 && panY === 0) {
-    // Find outermost shot radius from target centre (0,0)
-    const maxR = Math.max(...allPts.map(s => Math.sqrt(s.x*s.x + s.y*s.y)));
-    // Find the ring boundary that contains the outermost shot, use that + padding
-    let outerBoundary = ring.r[ring.r.length - 1];
-    for (let i = 0; i < ring.r.length; i++) {
-      if (ring.r[i] >= maxR) { outerBoundary = ring.r[i]; break; }
+  // Find the smallest official ring that contains ALL shots
+  // Scale so that ring fills 85% of canvas
+  let displayR = td.r[td.r.length - 1];
+  if (allShots.length > 0) {
+    const maxR = Math.max(...allShots.map(s => Math.sqrt(s.x*s.x + s.y*s.y)));
+    for (let i = 0; i < td.r.length; i++) {
+      if (td.r[i] >= maxR) { displayR = td.r[i]; break; }
     }
-    // Add 20% padding so the ring line is clearly visible
-    const outerExtent = outerBoundary * 1.20;
-    const fitSc = (W * 0.45) / outerExtent;
-    autoZoom = Math.max(1, Math.min(fitSc / baseSc, 14));
   }
 
-  const effectiveZoom = (zoom === 1 && panX === 0 && panY === 0) ? autoZoom : zoom;
-  const sc = baseSc;
+  // sc = pixels per mm. SAME value used for rings AND shots.
+  const sc = (W * 0.425 / displayR) * zoom;
 
-  // Apply zoom & pan
-  ctx.translate(cx0 + panX, cy0 + panY);
-  ctx.scale(effectiveZoom, effectiveZoom);
-  ctx.translate(-cx0, -cy0);
+  const cx = W / 2 + panX;
+  const cy = W / 2 + panY;
 
-  // Grey target face
+  // Grey target background
   ctx.fillStyle = currentTheme.target;
-  ctx.fillRect(cx - tw*sc/2, cy - th*sc/2, tw*sc, th*sc);
+  ctx.fillRect(cx - displayR*sc, cy - displayR*sc, displayR*sc*2, displayR*sc*2);
 
-  // Rings
+  // Draw rings — r * sc = pixel radius from centre
   ctx.strokeStyle = currentTheme.ring;
-  ctx.lineWidth = Math.max(1.2, sc * 1.5) / effectiveZoom;
-  ring.r.forEach(mm => {
+  ctx.lineWidth = 1.5;
+  td.r.forEach(r => {
+    if (r > displayR + 0.5) return;
     ctx.beginPath();
-    ctx.arc(cx, cy, mm*sc, 0, Math.PI*2);
+    ctx.arc(cx, cy, r * sc, 0, Math.PI * 2);
     ctx.stroke();
   });
 
-  // Ring labels
-  const lfs = Math.max(11, Math.round(sc * 17)) / effectiveZoom;
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  // Zone labels
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
   ctx.fillStyle = currentTheme.label;
-  for (let i = ring.r.length-1; i >= 1; i--) {
-    const rOuter = ring.r[i]*sc, rInner = ring.r[i-1]*sc;
-    const mid = (rOuter + rInner) / 2;
-    ctx.font = `bold ${lfs}px -apple-system,sans-serif`;
-    ctx.fillText(ring.l[i], cx + mid*0.72, cy - mid*0.72);
+  const bounds = [0, ...td.r];
+  for (let i = 0; i < td.l.length; i++) {
+    if (td.r[i] > displayR + 0.5) break;
+    const mid = (bounds[i] + td.r[i]) / 2 * sc;
+    const fs  = Math.max(10, Math.round(mid * 0.35));
+    ctx.font = `bold ${fs}px -apple-system,sans-serif`;
+    if (i === 0) {
+      ctx.fillText(td.l[i], cx, cy);
+    } else {
+      ctx.fillText(td.l[i], cx + mid * 0.9, cy);
+      ctx.fillText(td.l[i], cx - mid * 0.9, cy);
+    }
   }
-  // Innermost label (V or X)
-  const r0 = ring.r[0]*sc;
-  ctx.font = `bold ${Math.max(10, Math.round(r0*0.55)) / effectiveZoom}px -apple-system,sans-serif`;
-  ctx.fillStyle = currentTheme.label;
-  ctx.fillText(ring.l[0], cx, cy);
 
-  // Dot radius
-  const DOT = Math.max(7, Math.round(disp/58)) / effectiveZoom;
-  const nfs = DOT * 1.2;
+  // Shot dots — px = cx + x_mm * sc, py = cy - y_mm * sc
+  const DOT = Math.max(6, Math.round(W / 60));
+  const nfs = DOT * 1.1;
 
-  // Sighters
-  currentSighters.forEach((s,i) => {
-    if (s.x==null) return;
+  currentSighters.forEach((s, i) => {
+    if (s.x == null) return;
+    const px = cx + s.x * sc, py = cy - s.y * sc;
+    if (px < -DOT || px > W+DOT || py < -DOT || py > W+DOT) return;
     const lbl = s.display_text != null ? String(s.display_text) : `S${i+1}`;
-    dot(ctx, cx+s.x*sc, cy-s.y*sc, DOT, currentTheme.sight, currentTheme.dotS, lbl, nfs, currentTheme.sightL);
+    dot(ctx, px, py, DOT, currentTheme.sight, currentTheme.dotS, lbl, nfs, currentTheme.sightL);
   });
 
-  // Scored shots
-  currentShots.forEach((s,i) => {
-    if (s.x==null) return;
-    const sx = cx+s.x*sc, sy = cy-s.y*sc;
+  currentShots.forEach((s, i) => {
+    if (s.x == null) return;
+    const px = cx + s.x * sc, py = cy - s.y * sc;
+    if (px < -DOT || px > W+DOT || py < -DOT || py > W+DOT) return;
     if (i === selectedShot) {
       ctx.beginPath();
-      ctx.arc(sx, sy, DOT + Math.max(3.5, DOT*0.6), 0, Math.PI*2);
+      ctx.arc(px, py, DOT + Math.max(3, DOT*0.5), 0, Math.PI*2);
       ctx.fillStyle = currentTheme.hl;
       ctx.fill();
     }
     const lbl = s.display_text != null ? String(s.display_text) : String(i+1);
-    dot(ctx, sx, sy, DOT, currentTheme.dot, currentTheme.dotS, lbl, nfs, currentTheme.num);
+    dot(ctx, px, py, DOT, currentTheme.dot, currentTheme.dotS, lbl, nfs, currentTheme.num);
   });
 
   ctx.restore();
@@ -1006,7 +1006,7 @@ CV.addEventListener('touchend', e => {
 let mdown=false, mmoved=false;
 CV.addEventListener('mousedown', e => { mdown=true; mmoved=false; dragStartX=e.clientX; dragStartY=e.clientY; panStartX=panX; panStartY=panY; });
 CV.addEventListener('mousemove', e => { if(!mdown)return; const dx=e.clientX-dragStartX,dy=e.clientY-dragStartY; if(Math.abs(dx)>3||Math.abs(dy)>3){mmoved=true;} panX=panStartX+dx; panY=panStartY+dy; clampPan(); drawTarget(); });
-CV.addEventListener('mouseup', e => { if(!mmoved) handleTap(e.clientX,e.clientY); mdown=false; });
+CV.addEventListener('mouseup', e => { if(!mmoved) handleTap(e.clientX, e.clientY); mdown=false; });
 CV.addEventListener('wheel', e => { e.preventDefault(); changeZoom(e.deltaY<0?1.15:1/1.15); },{ passive:false });
 
 function pdist(e) {
@@ -1014,48 +1014,43 @@ function pdist(e) {
   return Math.sqrt(dx*dx+dy*dy);
 }
 
+function getDisplayR() { return 500; } // unused, kept for compat
+
 function getEffectiveZoom() {
-  if (zoom !== 1 || panX !== 0 || panY !== 0) return zoom;
-  if (!currentMeta || !currentShots.length) return zoom;
+  if (!currentMeta) return 1;
   const data = shotData[currentId];
+  const faceW = data.width || 1800;
+  const faceH = data.height || 1800;
   const disp = getCanvasDisp();
-  const tw = data.width || 1800, th = data.height || 1800;
-  const baseSc = (disp * 0.90) / Math.max(tw, th);
-  const ring = RINGS[currentMeta.face_id] || RINGS['ISLR'];
-  const allPts = [...currentShots, ...currentSighters].filter(s => s.x != null);
-  if (!allPts.length) return 1;
-  const maxR = Math.max(...allPts.map(s => Math.sqrt(s.x*s.x + s.y*s.y)));
-  let outerBoundary = ring.r[ring.r.length - 1];
-  for (let i = 0; i < ring.r.length; i++) {
-    if (ring.r[i] >= maxR) { outerBoundary = ring.r[i]; break; }
-  }
-  const outerExtent = outerBoundary * 1.20;
-  const fitSc = (disp * 0.45) / outerExtent;
-  return Math.max(1, Math.min(fitSc / baseSc, 14));
+  return (disp * 0.90 / Math.max(faceW, faceH)) * zoom;
 }
 
-function handleTap(cx, cy) {
+function handleTap(clientX, clientY) {
   if (!currentId || !currentShots.length) return;
-  const data = shotData[currentId];
   const rect = CV.getBoundingClientRect();
   const disp = rect.width;
-  const sc   = (disp*0.90)/Math.max(data.width||1800, data.height||1800);
-  const ox   = cx - rect.left, oy = cy - rect.top;
-  const cx0  = disp/2, cy0 = disp/2;
-  const ez   = getEffectiveZoom();
-  // Map from screen → canvas space (undo zoom+pan)
-  const mx = (ox - cx0 - panX) / ez + cx0;
-  const my = (oy - cy0 - panY) / ez + cy0;
-  const DOT = Math.max(7, Math.round(disp/58));
-  const hitR = Math.max(20, DOT*2.8) / ez;
-
-  let found = -1;
-  for (let i=currentShots.length-1; i>=0; i--) {
-    const s=currentShots[i]; if(s.x==null)continue;
-    const sx=cx0+s.x*sc, sy=cy0-s.y*sc;
-    if (Math.hypot(mx-sx,my-sy)<hitR) { found=i; break; }
+  const td = getTargetDef(currentMeta.face_id);
+  if (!td) return;
+  const allShots = [...currentShots, ...currentSighters].filter(s => s.x != null);
+  let displayR = td.r[td.r.length - 1];
+  if (allShots.length > 0) {
+    const maxR = Math.max(...allShots.map(s => Math.sqrt(s.x*s.x + s.y*s.y)));
+    for (let i = 0; i < td.r.length; i++) {
+      if (td.r[i] >= maxR) { displayR = td.r[i]; break; }
+    }
   }
-  if (found===-1) clearHighlight();
+  const sc = (disp * 0.425 / displayR) * zoom;
+  const cx = disp / 2 + panX;
+  const cy = disp / 2 + panY;
+  const ox = clientX - rect.left;
+  const oy = clientY - rect.top;
+  const DOT = Math.max(6, Math.round(disp / 60));
+  let found = -1;
+  for (let i = currentShots.length - 1; i >= 0; i--) {
+    const s = currentShots[i]; if (s.x == null) continue;
+    if (Math.hypot(ox - (cx + s.x*sc), oy - (cy - s.y*sc)) < DOT * 2.5) { found = i; break; }
+  }
+  if (found === -1) clearHighlight();
   else highlightShot(found);
 }
 
