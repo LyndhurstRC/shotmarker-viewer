@@ -192,6 +192,19 @@
     font-weight: 700; font-size: 12px;
     background: #2a2a2a; color: #fff;
   }
+
+  /* Score strip cells */
+  .ss-cell {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 28px; height: 28px; border-radius: 5px;
+    font-weight: 700; font-size: 13px;
+    background: var(--surface2); color: var(--text);
+    border: 1px solid var(--border);
+    cursor: pointer;
+  }
+  .ss-cell:hover { border-color: var(--accent); }
+  .ss-cell.hl { background: var(--accent); color: #000; border-color: var(--accent); }
+  .ss-cell.sighter { background: var(--bg); color: var(--muted); font-size: 11px; }
   #shot-detail .sd-dismiss { margin-left: auto; color: var(--muted); cursor: pointer; font-size: 20px; line-height: 1; }
 
   /* SHOT TABLE */
@@ -300,6 +313,19 @@
     </div>
 
     <div id="session-info" style="display:none"></div>
+
+    <!-- Score strip - matches Shotmarker app layout -->
+    <div id="score-strip" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 14px;width:100%;max-width:660px;">
+      <div style="display:flex;gap:16px;align-items:baseline;margin-bottom:8px;flex-wrap:wrap">
+        <div id="ss-shots" style="font-size:13px;color:var(--muted)"></div>
+        <div id="ss-total" style="font-size:20px;font-weight:700;color:var(--text)"></div>
+        <div style="margin-left:auto;text-align:right">
+          <div id="ss-avg" style="font-size:13px;color:var(--muted)"></div>
+          <div id="ss-sd" style="font-size:13px;color:var(--muted)"></div>
+        </div>
+      </div>
+      <div id="ss-grid" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+    </div>
 
     <div id="target-wrap" style="display:none">
       <canvas id="target-canvas"></canvas>
@@ -499,11 +525,13 @@ function openSession(id) {
 
   document.getElementById('empty-state').style.display = 'none';
   document.getElementById('session-info').style.display = '';
+  document.getElementById('score-strip').style.display = '';
   document.getElementById('target-wrap').style.display = '';
   document.getElementById('shot-table-wrap').style.display = '';
   document.getElementById('shot-detail').style.display = 'none';
 
   renderInfo();
+  renderScoreStrip();
   drawTarget();
   renderTable();
 }
@@ -537,7 +565,57 @@ function renderInfo() {
     </div>`;
 }
 
-// ── Target ring definitions (radii in mm from centre) ─────────────────────────
+// ── Score strip ───────────────────────────────────────────────────────────────
+function renderScoreStrip() {
+  const shots = currentShots, sighters = currentSighters;
+
+  // Shot count
+  document.getElementById('ss-shots').textContent = `${shots.length} shots`;
+
+  // Total score formatted like Shotmarker: "68-7V" or "42-3X"
+  let numeric = 0, xCount = 0, vCount = 0;
+  shots.forEach(s => {
+    const sc = String(s.score ?? '');
+    if (sc === 'X') { numeric += 6; xCount++; }
+    else if (sc === 'V') { numeric += 5; vCount++; }
+    else { numeric += parseInt(sc) || 0; }
+  });
+  let totalStr = String(numeric);
+  if (xCount > 0) totalStr += `-${xCount}X`;
+  else if (vCount > 0) totalStr += `-${vCount}V`;
+  document.getElementById('ss-total').textContent = totalStr;
+
+  // Velocity avg & SD
+  const vels = shots.filter(s => s.v && s.v > 0).map(s => s.v);
+  if (vels.length > 1) {
+    const avg = vels.reduce((a,b)=>a+b,0)/vels.length;
+    const sd = Math.sqrt(vels.map(v=>(v-avg)**2).reduce((a,b)=>a+b,0)/vels.length);
+    document.getElementById('ss-avg').textContent = `avg ${Math.round(avg)}`;
+    document.getElementById('ss-sd').textContent = `SD ${sd.toFixed(1)}`;
+  } else {
+    document.getElementById('ss-avg').textContent = '';
+    document.getElementById('ss-sd').textContent = '';
+  }
+
+  // Shot grid — each shot as a tappable cell, sighters greyed out first
+  const grid = document.getElementById('ss-grid');
+  grid.innerHTML = '';
+  sighters.forEach((s, i) => {
+    const cell = document.createElement('div');
+    cell.className = 'ss-cell sighter';
+    cell.textContent = `S${i+1}`;
+    cell.title = `Sighter ${i+1}`;
+    grid.appendChild(cell);
+  });
+  shots.forEach((s, i) => {
+    const cell = document.createElement('div');
+    cell.className = 'ss-cell' + (i === selectedShot ? ' hl' : '');
+    cell.textContent = String(s.score ?? '?');
+    cell.title = `Shot ${i+1}`;
+    cell.onclick = () => highlightShot(i);
+    grid.appendChild(cell);
+  });
+}
 const RINGS = {
   'ISLR':   { r:[55,100,155,220,290,365], l:['V','5','4','3','2','1'] },
   'IS600y': { r:[40, 80,125,180,240,305], l:['V','5','4','3','2','1'] },
@@ -766,12 +844,17 @@ function highlightShot(idx) {
   document.querySelectorAll('#shot-tbody tr').forEach((tr,i) => tr.classList.toggle('hl', i===idx));
   const rows = document.querySelectorAll('#shot-tbody tr');
   if (rows[idx]) rows[idx].scrollIntoView({ block:'nearest', behavior:'smooth' });
+  // Update score strip highlight
+  document.querySelectorAll('#ss-grid .ss-cell:not(.sighter)').forEach((c,i) => c.classList.toggle('hl', i===idx));
+  const cells = document.querySelectorAll('#ss-grid .ss-cell:not(.sighter)');
+  if (cells[idx]) cells[idx].scrollIntoView({ block:'nearest', behavior:'smooth' });
 }
 
 function clearHighlight() {
   selectedShot = null;
   document.getElementById('shot-detail').style.display = 'none';
   document.querySelectorAll('#shot-tbody tr').forEach(tr=>tr.classList.remove('hl'));
+  document.querySelectorAll('#ss-grid .ss-cell').forEach(c=>c.classList.remove('hl'));
   drawTarget();
 }
 
