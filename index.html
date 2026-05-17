@@ -1,4 +1,5 @@
-<index.html>
+
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -87,8 +88,17 @@
 
   #app { display: none; flex-direction: column; min-height: calc(100vh - 56px); }
 
-  #session-panel { background: var(--surface); border-bottom: 1px solid var(--border); }
-  .sp-top { display: flex; align-items: center; gap: 8px; padding: 8px 10px 4px; flex-wrap: wrap; }
+  #session-panel {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    max-height: 42vh; overflow-y: auto; flex-shrink: 0;
+  }
+  #session-panel::-webkit-scrollbar { width: 4px; }
+  #session-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .sp-top {
+    display: flex; align-items: center; gap: 8px; padding: 8px 10px 6px;
+    flex-wrap: wrap; position: sticky; top: 0; background: var(--surface);
+    z-index: 10; border-bottom: 1px solid var(--border);
+  }
   #search-input {
     background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
     color: var(--text); padding: 6px 10px; font-size: 13px; width: 150px; flex-shrink: 0;
@@ -101,15 +111,21 @@
   }
   .filter-chip.active { background: rgba(91,141,238,0.2); border-color: var(--accent2); color: var(--accent2); }
 
-  #session-list { display: flex; overflow-x: auto; padding: 5px 10px 8px; }
-  #session-list::-webkit-scrollbar { height: 3px; }
-  #session-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-  .date-group { display: flex; flex-direction: column; margin-right: 10px; flex-shrink: 0; }
-  .date-lbl { font-size: 10px; color: var(--muted); padding: 0 3px 3px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap; }
-  .date-row { display: flex; gap: 5px; }
+  /* Vertical date list */
+  #session-list { display: flex; flex-direction: column; padding: 0; }
+  .date-group { display: flex; align-items: center; border-bottom: 1px solid var(--border); min-height: 48px; }
+  .date-lbl {
+    font-size: 11px; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;
+    padding: 8px 12px; min-width: 100px; flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    background: var(--surface2);
+    align-self: stretch; display: flex; align-items: center;
+  }
+  .date-row { display: flex; gap: 6px; padding: 6px 10px; flex-wrap: wrap; align-items: center; flex: 1; }
   .session-btn {
-    background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
-    padding: 7px 11px; cursor: pointer; white-space: nowrap; color: var(--text);
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 6px 11px; cursor: pointer; white-space: nowrap; color: var(--text);
     font-size: 12px; flex-shrink: 0; text-align: left;
   }
   .session-btn.active { border-color: var(--accent); background: rgba(232,160,32,0.15); color: var(--accent); }
@@ -209,7 +225,7 @@
     <div class="sub">Offline backup viewer</div>
   </div>
   <button class="hdr-btn" id="btn-reload" style="display:none" onclick="resetApp()">⟳ New backup</button>
-  <a id="drive-link-hdr" href="https://drive.google.com/drive/folders/16ziDZMijxlZAigotp-WxkjOVgWUoZRvt?usp=drive_link" target="_blank" class="drive-btn-small" style="display:none">
+  <a id="drive-link-hdr" href="YOUR_GOOGLE_DRIVE_LINK_HERE" target="_blank" class="drive-btn-small" style="display:none">
     <svg width="14" height="14" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
       <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#fff"/>
       <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#fff"/>
@@ -225,7 +241,7 @@
 <div id="load-screen">
 
   <!-- Step 1: Get the backup file -->
-  <a id="drive-link" href="https://drive.google.com/drive/folders/16ziDZMijxlZAigotp-WxkjOVgWUoZRvt?usp=drive_link" target="_blank" class="drive-btn">
+  <a id="drive-link" href="YOUR_GOOGLE_DRIVE_LINK_HERE" target="_blank" class="drive-btn">
     <svg width="20" height="20" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
       <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
       <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/>
@@ -234,13 +250,13 @@
       <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
       <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 27h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
     </svg>
-    Step 1 — Open Lyndhurst RC Folder
+    Step 1 — Open Backup Drive Folder
   </a>
 
   <div class="how-to">
     <h3>How to view a session</h3>
     <ol>
-      <li>Tap <strong>Open Lyndhurst RC Folder</strong> above and download the backup file <span>(.tar)</span> you want to view</li>
+      <li>Tap <strong>Open Backup Drive Folder</strong> above and download the backup file <span>(.tar)</span> you want to view</li>
       <li>Come back to this page and tap the target below</li>
       <li>Select the downloaded <span>.tar</span> file from your Downloads folder</li>
     </ol>
@@ -421,6 +437,8 @@ function filterSessions() {
   c.innerHTML = '';
   const byDate = {};
   list.forEach(s => { if (!byDate[s.dateStr]) byDate[s.dateStr]=[]; byDate[s.dateStr].push(s); });
+  // Sort sessions within each date alphabetically by name
+  Object.values(byDate).forEach(arr => arr.sort((a,b) => (a.name||'').localeCompare(b.name||'')));
   Object.entries(byDate).forEach(([date, slist]) => {
     const g = document.createElement('div'); g.className = 'date-group';
     const lbl = document.createElement('div'); lbl.className = 'date-lbl'; lbl.textContent = date;
@@ -429,7 +447,10 @@ function filterSessions() {
       const btn = document.createElement('div');
       btn.className = 'session-btn' + (s.id===currentId?' active':'');
       btn.innerHTML = `<div class="s-name">${s.name||'unnamed'}</div><div class="s-meta">${s.count} shots · ${s.dist} · ${s.time}</div>`;
-      btn.onclick = () => openSession(s.id);
+      btn.onclick = () => {
+        openSession(s.id);
+        btn.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      };
       row.appendChild(btn);
     });
     g.appendChild(lbl); g.appendChild(row); c.appendChild(g);
