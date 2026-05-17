@@ -544,8 +544,12 @@ function openSession(id) {
   currentMeta = sessions.find(s => s.id === id);
   const data = shotData[id];
   if (!data || !currentMeta) return;
-  currentShots = data.shots || [];
-  currentSighters = data.shots_invalid || [];
+
+  // Sighters are in the main shots array with display_text 'S1', 'S2' etc.
+  // shots_invalid are off-target errors — don't plot these
+  const allShots = data.shots || [];
+  currentSighters = allShots.filter(s => typeof s.display_text === 'string' && s.display_text.startsWith('S'));
+  currentShots    = allShots.filter(s => !(typeof s.display_text === 'string' && s.display_text.startsWith('S')));
 
   document.getElementById('empty-state').style.display = 'none';
   document.getElementById('session-info').style.display = '';
@@ -641,25 +645,20 @@ function renderScoreStrip() {
     grid.appendChild(cell);
   });
 }
-// ── Target ring definitions — official ICFRA dimensions (radii in mm) ─────────
-// Source: ICFRA Rule Book Appendix D3. Dimensions are diameters ÷ 2.
-// Zones: X/V = Super V, 6/V = Central Bull, 5 = Inner, 4 = Magpie, 3 = Outer, 2 = Hit
-// Imperial yards
+// ── Target ring definitions — boundaries from actual shot data (midpoint method) ──
 const RINGS = {
-  'ISLR':   { r:[ 64, 128, 255, 408, 560, 660], l:['V','5','4','3','2','1'] }, // 1000y
-  'IS600y': { r:[ 36,  73, 145, 300, 458, 660], l:['V','5','4','3','2','1'] }, // 600y
-  'IS500y': { r:[ 33,  65, 130, 300, 458, 660], l:['V','5','4','3','2','1'] }, // 500y
-  'IS300m': { r:[ 18,  35,  70, 140, 210, 300], l:['V','5','4','3','2','1'] }, // 300m
-  'IS500m': { r:[ 36,  73, 145, 330, 500, 660], l:['V','5','4','3','2','1'] }, // 500m
-  'IS600y': { r:[ 36,  73, 145, 300, 458, 660], l:['V','5','4','3','2','1'] }, // 600y = 700y spec
-  // F-Class: X = Super V (half diameter of Central Bull), 6 = Central Bull
-  'IFX300m':{ r:[ 18,  35,  70, 140, 210, 300], l:['X','6','5','4','3','2'] }, // 300m
-  'IFX500m':{ r:[ 36,  73, 145, 330, 500, 660], l:['X','6','5','4','3','2'] }, // 500m
-  'IFX500y':{ r:[ 33,  65, 130, 300, 458, 660], l:['X','6','5','4','3','2'] }, // 500y
-  'IFX600m':{ r:[ 40,  80, 160, 330, 500, 660], l:['X','6','5','4','3','2'] }, // 600m
-  'IFX600y':{ r:[ 36,  73, 145, 300, 458, 660], l:['X','6','5','4','3','2'] }, // 600y
-  'IFXLR':  { r:[ 64, 128, 255, 408, 560, 660], l:['X','6','5','4','3','2'] }, // 900m/1000y
-  'UKTR300':{ r:[ 18,  35,  70, 140, 210, 300], l:['V','5','4','3','2','1'] }, // 300m
+  'ISLR':   { r:[131, 260, 411, 563, 937, 1100], l:['V','5','4','3','2','1'] },
+  'IS600y': { r:[ 77, 149, 299, 454, 603, 800],  l:['V','5','4','3','2','1'] },
+  'IS500y': { r:[ 69, 134, 220, 320, 430, 560],  l:['V','5','4','3','2','1'] },
+  'IS500m': { r:[ 76, 148, 335, 500, 640, 780],  l:['V','5','4','3','2','1'] },
+  'IS300m': { r:[ 39,  73, 141, 202, 306, 594],  l:['V','5','4','3','2','1'] },
+  'IFX600y':{ r:[ 40,  76, 145, 303, 563, 750],  l:['X','6','5','4','3','2'] },
+  'IFX600m':{ r:[ 43,  82, 166, 331, 500, 650],  l:['X','6','5','4','3','2'] },
+  'IFX500y':{ r:[ 37,  70, 135, 307, 450, 600],  l:['X','6','5','4','3','2'] },
+  'IFX500m':{ r:[ 40,  77, 158, 400, 600, 780],  l:['X','6','5','4','3','2'] },
+  'IFX300m':{ r:[ 21,  39,  75, 160, 250, 340],  l:['X','6','5','4','3','2'] },
+  'IFXLR':  { r:[ 67, 133, 261, 414, 619, 800],  l:['X','6','5','4','3','2'] },
+  'UKTR300':{ r:[ 46,  80, 121, 417, 550, 700],  l:['V','5','4','3','2','1'] },
 };
 
 // ── Colour themes ─────────────────────────────────────────────────────────────
@@ -732,14 +731,19 @@ function drawTarget() {
   // Base scale: fit full target face
   const baseSc = (W * 0.90) / Math.max(tw, th);
 
-  // Auto-fit: zoom as tight as possible around all shots with small padding
+  // Auto-fit: zoom to show all shots with their containing ring visible
   const allPts = [...currentShots, ...currentSighters].filter(s => s.x != null);
   let autoZoom = 1;
   if (allPts.length > 0 && zoom === 1 && panX === 0 && panY === 0) {
-    const maxX = Math.max(...allPts.map(s => Math.abs(s.x)));
-    const maxY = Math.max(...allPts.map(s => Math.abs(s.y)));
-    const DOT_MM = 15;
-    const outerExtent = Math.max(maxX, maxY) + DOT_MM * 3;
+    // Find outermost shot radius from target centre (0,0)
+    const maxR = Math.max(...allPts.map(s => Math.sqrt(s.x*s.x + s.y*s.y)));
+    // Find the ring boundary that contains the outermost shot, use that + padding
+    let outerBoundary = ring.r[ring.r.length - 1];
+    for (let i = 0; i < ring.r.length; i++) {
+      if (ring.r[i] >= maxR) { outerBoundary = ring.r[i]; break; }
+    }
+    // Add 20% padding so the ring line is clearly visible
+    const outerExtent = outerBoundary * 1.20;
     const fitSc = (W * 0.45) / outerExtent;
     autoZoom = Math.max(1, Math.min(fitSc / baseSc, 14));
   }
@@ -1017,12 +1021,15 @@ function getEffectiveZoom() {
   const disp = getCanvasDisp();
   const tw = data.width || 1800, th = data.height || 1800;
   const baseSc = (disp * 0.90) / Math.max(tw, th);
+  const ring = RINGS[currentMeta.face_id] || RINGS['ISLR'];
   const allPts = [...currentShots, ...currentSighters].filter(s => s.x != null);
   if (!allPts.length) return 1;
-  const maxX = Math.max(...allPts.map(s => Math.abs(s.x)));
-  const maxY = Math.max(...allPts.map(s => Math.abs(s.y)));
-  const DOT_MM = 15;
-  const outerExtent = Math.max(maxX, maxY) + DOT_MM * 3;
+  const maxR = Math.max(...allPts.map(s => Math.sqrt(s.x*s.x + s.y*s.y)));
+  let outerBoundary = ring.r[ring.r.length - 1];
+  for (let i = 0; i < ring.r.length; i++) {
+    if (ring.r[i] >= maxR) { outerBoundary = ring.r[i]; break; }
+  }
+  const outerExtent = outerBoundary * 1.20;
   const fitSc = (disp * 0.45) / outerExtent;
   return Math.max(1, Math.min(fitSc / baseSc, 14));
 }
