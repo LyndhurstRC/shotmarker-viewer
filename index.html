@@ -224,7 +224,8 @@
     <div class="title">Shotmarker Viewer</div>
     <div class="sub">Offline backup viewer</div>
   </div>
-  <button class="hdr-btn" id="btn-reload" style="display:none" onclick="resetApp()">⟳ New backup</button>
+  <button class="hdr-btn" id="btn-reload" style="display:none" onclick="document.getElementById('file-input-hdr').click()">⟳ New backup</button>
+  <input type="file" id="file-input-hdr" accept=".tar" style="display:none">
   <a id="drive-link-hdr" href="https://drive.google.com/drive/folders/16ziDZMijxlZAigotp-WxkjOVgWUoZRvt?usp=sharing" target="_blank" class="drive-btn-small" style="display:none">
     <svg width="14" height="14" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
       <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#fff"/>
@@ -341,6 +342,7 @@ let tapMoved = false;
 
 // ── File loading ──────────────────────────────────────────────────────────────
 document.getElementById('file-input').addEventListener('change', e => { if (e.target.files[0]) loadTar(e.target.files[0]); });
+document.getElementById('file-input-hdr').addEventListener('change', e => { if (e.target.files[0]) loadTar(e.target.files[0]); });
 const dz = document.getElementById('drop-zone');
 dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
 dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
