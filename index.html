@@ -441,7 +441,6 @@ async function loadTar(file) {
 
   console.log('Sessions loaded:', sessions.length, 'Skipped:', skipped);
   sessions.sort((a,b) => b.ts - a.ts);
-  buildRingsFromBackup();
   prog('');
   document.getElementById('load-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
@@ -651,45 +650,28 @@ function renderScoreStrip() {
 // All values are radii in mm (diameter/2)
 // IS targets: V ring = central bull (superV scores same as V)
 // IFX targets: X = superV ring, 6 = central bull
-// ── Ring boundaries — computed from loaded backup data per face_id ────────────
-let COMPUTED_RINGS = {}; // populated after each backup loads
-
-function buildRingsFromBackup() {
-  const orderIS  = ['V','5','4','3','2','1'];
-  const orderIFX = ['X','6','5','4','3','2'];
-  const byFace = {};
-
-  for (const id of Object.keys(shotData)) {
-    const j = shotData[id];
-    const fid = j.face_id;
-    if (!fid) continue;
-    if (!byFace[fid]) byFace[fid] = {};
-    for (const s of (j.shots || [])) {
-      if (s.x == null || s.score == null) continue;
-      const r = Math.sqrt(s.x*s.x + s.y*s.y);
-      const sc = String(s.score);
-      if (!byFace[fid][sc]) byFace[fid][sc] = [];
-      byFace[fid][sc].push(r);
-    }
-  }
-
-  COMPUTED_RINGS = {};
-  for (const [fid, zones] of Object.entries(byFace)) {
-    const order = fid.startsWith('IFX') ? orderIFX : orderIS;
-    const present = order.filter(sc => zones[sc] && zones[sc].length > 0);
-    if (present.length < 2) continue;
-    const boundaries = [];
-    for (let i = 0; i < present.length - 1; i++) {
-      const innerMax = Math.max(...zones[present[i]]);
-      const outerMin = Math.min(...zones[present[i+1]]);
-      boundaries.push((innerMax + outerMin) / 2);
-    }
-    COMPUTED_RINGS[fid] = { r: boundaries, l: present };
-  }
-}
+// ── Official ICFRA target ring radii (mm from centre) ────────────────────────
+// Source: ICFRA Rule Book Appendix D3, diameter/2
+// IS targets:  [V, 5, 4, 3, 2, 1]
+// IFX targets: [X, 6, 5, 4, 3, 2]
+const OFFICIAL_RINGS = {
+  'IS300m':  { r:[ 35,   70,  140,  210,  300,  600], l:['V','5','4','3','2','1'] },
+  'IS500m':  { r:[ 72.5, 145, 330,  500,  660,  900], l:['V','5','4','3','2','1'] },
+  'IS500y':  { r:[ 65,   130, 300,  457.5,660,  900], l:['V','5','4','3','2','1'] },
+  'IS600m':  { r:[ 80,   160, 330,  500,  660,  900], l:['V','5','4','3','2','1'] },
+  'IS600y':  { r:[ 72.5, 145, 300,  457.5,660,  900], l:['V','5','4','3','2','1'] },
+  'ISLR':    { r:[127.5, 255, 407.5, 560, 915, 1200], l:['V','5','4','3','2','1'] },
+  'UKTR300': { r:[ 35,   70,  140,  210,  300,  600], l:['V','5','4','3','2','1'] },
+  'IFX300m': { r:[ 17.5,  35,  70,  140,  210,  300], l:['X','6','5','4','3','2'] },
+  'IFX500m': { r:[ 36,  72.5, 145,  330,  500,  660], l:['X','6','5','4','3','2'] },
+  'IFX500y': { r:[ 32.5,  65, 130,  300, 457.5, 660], l:['X','6','5','4','3','2'] },
+  'IFX600m': { r:[ 40,    80, 160,  330,  500,  660], l:['X','6','5','4','3','2'] },
+  'IFX600y': { r:[ 36,  72.5, 145,  300, 457.5, 660], l:['X','6','5','4','3','2'] },
+  'IFXLR':   { r:[ 63.5,127.5,255, 407.5, 560,  915], l:['X','6','5','4','3','2'] },
+};
 
 function getTargetDef(faceId) {
-  return COMPUTED_RINGS[faceId] || null;
+  return OFFICIAL_RINGS[faceId] || null;
 }
 
 // ── Colour themes ─────────────────────────────────────────────────────────────
