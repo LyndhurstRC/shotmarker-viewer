@@ -683,7 +683,9 @@ function calcScale(faceId, allShots, canvasW, zoom) {
   const td = getTargetDef(faceId);
   if (!td || allShots.length === 0) return { sc: 1, displayR: 500, td };
 
-  const maxR = Math.max(...allShots.map(s => Math.sqrt(s.x*s.x + s.y*s.y)));
+  const cal_x = (shotData[currentId]?.cal_x) || 0;
+  const cal_y = (shotData[currentId]?.cal_y) || 0;
+  const maxR = Math.max(...allShots.map(s => Math.sqrt((s.x+cal_x)**2 + (s.y+cal_y)**2)));
 
   // Find the first official ring boundary >= maxR
   // This ring contains all shots — scale so it fills 85% of canvas
@@ -776,13 +778,15 @@ function drawTarget() {
     }
   }
 
-  // Shot dots — px = cx + x_mm * sc, py = cy - y_mm * sc
+  // Shot dots — plotted at (x + cal_x, y + cal_y) matching Shotmarker's scoring logic
+  const cal_x = shotData[currentId]?.cal_x || 0;
+  const cal_y = shotData[currentId]?.cal_y || 0;
   const DOT = Math.max(6, Math.round(W / 60));
   const nfs = DOT * 1.1;
 
   currentSighters.forEach((s, i) => {
     if (s.x == null) return;
-    const px = cx + s.x * sc, py = cy - s.y * sc;
+    const px = cx + (s.x + cal_x) * sc, py = cy - (s.y + cal_y) * sc;
     if (px < -DOT || px > W+DOT || py < -DOT || py > W+DOT) return;
     const lbl = s.display_text != null ? String(s.display_text) : `S${i+1}`;
     dot(ctx, px, py, DOT, currentTheme.sight, currentTheme.dotS, lbl, nfs, currentTheme.sightL);
@@ -790,7 +794,7 @@ function drawTarget() {
 
   currentShots.forEach((s, i) => {
     if (s.x == null) return;
-    const px = cx + s.x * sc, py = cy - s.y * sc;
+    const px = cx + (s.x + cal_x) * sc, py = cy - (s.y + cal_y) * sc;
     if (px < -DOT || px > W+DOT || py < -DOT || py > W+DOT) return;
     if (i === selectedShot) {
       ctx.beginPath();
@@ -1032,7 +1036,9 @@ function handleTap(clientX, clientY) {
   let found = -1;
   for (let i = currentShots.length - 1; i >= 0; i--) {
     const s = currentShots[i]; if (s.x == null) continue;
-    if (Math.hypot(ox - (cx + s.x*sc), oy - (cy - s.y*sc)) < DOT * 2.5) { found = i; break; }
+    const cal_x = shotData[currentId]?.cal_x || 0;
+    const cal_y = shotData[currentId]?.cal_y || 0;
+    if (Math.hypot(ox - (cx + (s.x+cal_x)*sc), oy - (cy - (s.y+cal_y)*sc)) < DOT * 2.5) { found = i; break; }
   }
   if (found === -1) clearHighlight();
   else highlightShot(found);
