@@ -306,9 +306,19 @@
 
 <div id="load-screen">
 
+  <div class="how-to">
+    <h3>How to view a session</h3>
+    <ol>
+      <li>Tap <strong>Step 1</strong> below to open the LyndhurstRC Drive folder</li>
+      <li>Find the backup file you want to view <span>(.tar)</span> and <strong>download it</strong>
+        <br><span>On Android: press and hold the file → tap Download · On iPhone/iPad: tap the file → tap the share icon → Save to Files</span>
+      </li>
+      <li>Tap <strong>Step 2</strong> below and select the <span>.tar</span> file from your <strong>Downloads</strong> folder</li>
+    </ol>
+  </div>
 
-  <!-- Step 1: Get the backup file -->
-  <a id="drive-link" href="https://drive.google.com/drive/folders/16ziDZMijxlZAigotp-WxkjOVgWUoZRvt?usp=sharing" target="_blank" class="drive-btn">
+  <!-- Step 1: Get the backup file from Drive -->
+  <a id="drive-link" href="https://drive.google.com/drive/folders/16ziDZMijxlZAigotp-WxkjOVgWUoZRvt?usp=sharing" target="_blank" class="drive-btn" style="width:100%;max-width:320px;box-sizing:border-box;justify-content:center;">
     <svg width="20" height="20" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
       <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
       <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/>
@@ -319,18 +329,6 @@
     </svg>
     Step 1 — Open LyndhurstRC Drive Folder
   </a>
-
-  <div class="how-to">
-    <h3>How to view a session</h3>
-    <ol>
-      <li>Tap <strong>Step 1</strong> above — the LyndhurstRC Drive folder will open in a new tab</li>
-      <li>Find the backup file you want to view <span>(.tar)</span> and <strong>download it</strong> — don't just open it
-        <br><span>On Android: press and hold the file → tap Download · On iPhone/iPad: tap the file → tap the share icon → Save to Files</span>
-      </li>
-      <li>Switch back to this tab and tap <strong>Step 2</strong> below</li>
-      <li>Navigate to your <strong>Downloads</strong> folder and select the <span>.tar</span> file you just downloaded</li>
-    </ol>
-  </div>
 
   <!-- Step 2: Load the file -->
   <div class="drop-zone" id="drop-zone">
@@ -345,17 +343,19 @@
         <circle cx="45" cy="36" r="3"  fill="#1a1a1a"/>
       </svg>
     </div>
-    <h2>Step 2 — Load Backup File</h2>
+    <h2>Load Backup File</h2>
     <p>Tap the button below to select your downloaded<br><strong>SM_backup_*.tar</strong> file</p>
-    <label for="file-input" style="display:inline-block;margin-top:16px;background:var(--accent);color:#000;font-weight:700;padding:10px 28px;border-radius:8px;font-size:14px;cursor:pointer;">
-      Select File
+    <label for="file-input" style="display:inline-flex;align-items:center;gap:8px;margin-top:16px;background:var(--accent);color:#000;font-weight:600;padding:12px 22px;border-radius:10px;font-size:15px;cursor:pointer;width:100%;max-width:320px;box-sizing:border-box;justify-content:center;">
+      <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M3 7a2 2 0 0 1 2-2h4l2 2h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" fill="#1a73e8"/>
+        <path d="M3 10h18v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7z" fill="#4da3ff"/>
+      </svg>
+      Step 2 — Select File
     </label>
     <input type="file" id="file-input" accept=".tar" style="position:absolute;left:-9999px;opacity:0;">
   </div>
   <div id="load-progress"></div>
-  <div style="font-size:12px;color:#8e8e93;text-align:center;max-width:420px;line-height:1.5;padding:0 20px;margin-top:8px">
-
-  </div>
+  <div style="font-size:12px;color:#8e8e93;text-align:center;max-width:420px;line-height:1.5;padding:0 20px;margin-top:8px"></div>
 </div>
 
 <div id="app">
