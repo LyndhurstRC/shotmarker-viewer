@@ -387,16 +387,16 @@
 
     <!-- Score strip - matches Shotmarker app layout -->
     <div id="score-strip" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 14px;width:100%;max-width:660px;">
-      <div style="display:flex;gap:16px;align-items:baseline;margin-bottom:8px;flex-wrap:wrap">
+      <div style="display:flex;gap:12px;align-items:baseline;margin-bottom:8px;flex-wrap:wrap">
         <div id="ss-shots" style="font-size:13px;color:var(--muted)"></div>
+        <div id="ss-total" style="font-size:28px;font-weight:700;color:#e8a020;line-height:1"></div>
         <div style="margin-left:auto;text-align:right">
           <div id="ss-avg" style="font-size:13px;color:var(--accent2)"></div>
           <div id="ss-sd" style="font-size:13px;color:var(--muted)"></div>
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <div id="ss-grid" style="display:flex;flex-wrap:wrap;gap:4px;flex:1"></div>
-        <div id="ss-total" style="font-size:28px;font-weight:700;color:#e8a020;white-space:nowrap;padding-left:8px;border-left:1px solid var(--border)"></div>
+      <div style="display:flex;align-items:center;gap:8px;overflow-x:auto">
+        <div id="ss-grid" style="display:flex;flex-wrap:nowrap;gap:4px;flex:1;min-width:0"></div>
       </div>
     </div>
 
@@ -637,21 +637,96 @@ function openSession(id) {
   renderTable();
 }
 
+// ── Group size in MOA ─────────────────────────────────────────────────────────
+function calcGroupMOA(shots, distMm) {
+  // Max spread: largest pairwise distance between calibration-corrected shot positions
+  const cal_x = shotData[currentId]?.cal_x || 0;
+  const cal_y = shotData[currentId]?.cal_y || 0;
+  const pts = shots.filter(s => s.x != null).map(s => [s.x + cal_x, s.y + cal_y]);
+  if (pts.length < 2) return null;
+  let maxD = 0;
+  for (let i = 0; i < pts.length; i++)
+    for (let j = i+1; j < pts.length; j++) {
+      const d = Math.sqrt((pts[i][0]-pts[j][0])**2 + (pts[i][1]-pts[j][1])**2);
+      if (d > maxD) maxD = d;
+    }
+  // 1 MOA at distance = distMm / 3438 mm
+  const moaMm = distMm / 3438;
+  return maxD / moaMm;
+}
+
+function distToMm(dist, unit) {
+  // dist in yards or metres → mm
+  if (unit === 'y') return dist * 914.4;
+  return dist * 1000; // metres
+}
+
+// ── Velocity sparkline SVG ────────────────────────────────────────────────────
+function velSparkline(vels, w, h) {
+  if (!vels || vels.length < 2) return '';
+  const mn = Math.min(...vels), mx = Math.max(...vels);
+  const range = mx - mn || 1;
+  const avg = vels.reduce((a,b)=>a+b,0)/vels.length;
+  const sd  = Math.sqrt(vels.map(v=>(v-avg)**2).reduce((a,b)=>a+b,0)/vels.length);
+  const pad = 2;
+  const bw = Math.max(2, (w - pad*2 - (vels.length-1)*2) / vels.length);
+  const bars = vels.map((v, i) => {
+    const bh = Math.max(2, ((v - mn) / range) * (h - pad*2 - 6));
+    const x = pad + i * (bw + 2);
+    const y = h - pad - bh;
+    const col = Math.abs(v - avg) <= sd ? 'var(--accent2)' : '#e8a020';
+    return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" rx="1" fill="${col}" opacity="0.85"/>`;
+  }).join('');
+  const avgY = (h - pad - Math.max(2, ((avg-mn)/range)*(h-pad*2-6))).toFixed(1);
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" style="display:block">
+    ${bars}
+    <line x1="${pad}" y1="${avgY}" x2="${w-pad}" y2="${avgY}" stroke="rgba(255,255,255,0.3)" stroke-width="1" stroke-dasharray="3,2"/>
+  </svg>`;
+}
+
+function velSparklineFullWidth(vels, h) {
+  if (!vels || vels.length < 2) return '';
+  const mn = Math.min(...vels), mx = Math.max(...vels);
+  const range = mx - mn || 1;
+  const avg = vels.reduce((a,b)=>a+b,0)/vels.length;
+  const sd  = Math.sqrt(vels.map(v=>(v-avg)**2).reduce((a,b)=>a+b,0)/vels.length);
+  const n = vels.length;
+  const W = 300, pad = 2;
+  const bw = (W - pad*2 - (n-1)*2) / n;
+  const bars = vels.map((v, i) => {
+    const bh = Math.max(2, ((v - mn) / range) * (h - pad*2 - 4));
+    const x = pad + i * (bw + 2);
+    const y = h - pad - bh;
+    const col = Math.abs(v - avg) <= sd ? 'var(--accent2)' : '#e8a020';
+    return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" rx="1" fill="${col}" opacity="0.85"/>`;
+  }).join('');
+  const avgY = (h - pad - Math.max(2, ((avg-mn)/range)*(h-pad*2-4))).toFixed(1);
+  return `<svg viewBox="0 0 ${W} ${h}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" style="display:block;width:100%;height:${h}px">
+    ${bars}
+    <line x1="${pad}" y1="${avgY}" x2="${W-pad}" y2="${avgY}" stroke="rgba(255,255,255,0.3)" stroke-width="1" stroke-dasharray="3,2"/>
+  </svg>`;
+}
+
 // ── Session info panel ────────────────────────────────────────────────────────
 function renderInfo() {
   const meta = currentMeta, shots = currentShots;
+  const data = shotData[currentId];
 
   // ── Shotmarker velocity stats (from device, stored in m/s → convert to fps) ──
   const smVels = shots.filter(s => s.v && s.v > 0).map(s => s.v * FPS_CONV);
-  let velHTML = '';
-  if (smVels.length > 1) {
-    const avg = smVels.reduce((a,b)=>a+b,0)/smVels.length;
-    const sd  = Math.sqrt(smVels.map(v=>(v-avg)**2).reduce((a,b)=>a+b,0)/smVels.length);
-    const es  = Math.max(...smVels) - Math.min(...smVels);
-    velHTML = `
-      <div class="stat"><div class="val val-blue">${Math.round(avg)}</div><div class="lbl">avg fps</div></div>
-      <div class="stat"><div class="val">${sd.toFixed(1)}</div><div class="lbl">SD</div></div>
-      <div class="stat"><div class="val">${Math.round(es)}</div><div class="lbl">ES</div></div>`;
+
+  // ── Group size in MOA ──
+  let moaHTML = '';
+  if (shots.length >= 2 && data?.dist) {
+    const distMm = distToMm(data.dist, data.dist_unit || 'm');
+    const moa = calcGroupMOA(shots, distMm);
+    if (moa !== null) {
+      moaHTML = `
+        <div class="garmin-stat">
+          <div class="gval" style="color:#c080e0">${moa.toFixed(2)}</div>
+          <div class="glbl">Group MOA</div>
+        </div>`;
+    }
   }
 
   // ── Garmin panel ──
@@ -665,9 +740,9 @@ function renderInfo() {
     const mx   = Math.max(...gVels);
     const mn   = Math.min(...gVels);
     const sprd = mx - mn;
-    // Kinetic energy: KE (ft·lb) = 0.5 * mass_grains * v² / 450380
-    const grains = gArr._bulletWeight || shotData[currentId]?.bullet_weight || 155.5;
+    const grains = gArr._bulletWeight || data?.bullet_weight || 155.5;
     const ke = 0.5 * grains * avg * avg / 450380;
+    const spark = velSparklineFullWidth(gVels, 36);
 
     garminHTML = `
       <div class="garmin-panel">
@@ -702,6 +777,10 @@ function renderInfo() {
             <div class="glbl">Avg KE ft·lb</div>
           </div>
         </div>
+        ${spark ? `<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px">
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px">Velocity string — <span style="color:var(--accent2)">■</span> within 1 SD &nbsp;<span style="color:#e8a020">■</span> outside 1 SD</div>
+          ${spark}
+        </div>` : ''}
       </div>`;
   }
 
@@ -741,10 +820,11 @@ function renderInfo() {
         <div class="glbl">Min fps</div>
       </div>`;
   }
+  smStatHTML += moaHTML;
 
   const leftHTML = `
     <div class="garmin-panel">
-      <div class="garmin-panel-title">🎯 ${meta.name||'Unnamed'} ${grp} <span class="badge" style="font-size:9px">${meta.face_id}</span></div>
+      <div class="garmin-panel-title"><svg width="14" height="14" viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" style="vertical-align:middle;margin-right:4px;flex-shrink:0"><circle cx="7" cy="7" r="7" fill="white"/><circle cx="7" cy="7" r="5.5" fill="#1a1a1a"/><circle cx="7" cy="7" r="4" fill="white"/><circle cx="7" cy="7" r="2.5" fill="#1a1a1a"/><circle cx="7" cy="7" r="1.2" fill="white"/><circle cx="7" cy="7" r="0.6" fill="#1a1a1a"/></svg> ${meta.name||'Unnamed'} ${grp} <span class="badge" style="font-size:9px">${meta.face_id}</span></div>
       <div style="font-size:10px;color:var(--muted);margin-bottom:6px">${meta.target_name} · ${meta.dist} · ${meta.dateStr} ${meta.time}</div>
       <div class="garmin-grid">${smStatHTML}</div>
     </div>`;
