@@ -151,29 +151,30 @@
   .stat { text-align: center; }
   .stat .val { font-size: 20px; font-weight: 700; line-height: 1; }
   .stat .lbl { font-size: 10px; color: var(--muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.4px; }
-  .val-gold { color: var(--accent); }
+  .val-gold { color: #e8a020; }
   .val-blue { color: var(--accent2); }
   .val-sd { color: #e8a020; font-size: 24px !important; }
 
   /* Two-column info layout when Garmin data present */
-  .info-cols { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+  .info-cols { display: flex; flex-direction: column; gap: 10px; }
   .info-col-left { flex: 1; min-width: 0; }
   .garmin-panel {
-    flex: 0 0 auto; min-width: 168px;
+    flex: 1 1 100%; 
     background: var(--surface2); border: 1px solid var(--border);
-    border-radius: 9px; padding: 9px 12px;
+    border-radius: 9px; padding: 7px 12px;
   }
   .garmin-panel-title {
     font-size: 10px; font-weight: 600; text-transform: uppercase;
-    letter-spacing: 0.6px; color: var(--muted); margin-bottom: 8px;
+    letter-spacing: 0.6px; color: var(--muted); margin-bottom: 6px;
     display: flex; align-items: center; gap: 5px;
   }
   .garmin-grid {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px;
+    display: flex; gap: 0; justify-content: space-between;
   }
-  .garmin-stat { text-align: center; }
-  .garmin-stat .gval { font-size: 16px; font-weight: 700; line-height: 1; color: var(--text); }
-  .garmin-stat .gval.sd-hl { font-size: 20px; color: #e8a020; }
+  .garmin-stat { text-align: center; flex: 1; }
+  .garmin-stat .gval { font-size: 15px; font-weight: 700; line-height: 1; color: var(--text); }
+  .garmin-stat .gval.sd-hl { font-size: 18px; color: #e8a020; }
+  .garmin-stat .gval.avg-hl { color: var(--accent2); }
   .garmin-stat .glbl { font-size: 9px; color: var(--muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.4px; }
 
   /* TARGET */
@@ -267,7 +268,15 @@
 <body>
 
 <header>
-  <div class="logo">S</div>
+  <svg width="36" height="36" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;border-radius:7px">
+    <rect width="36" height="36" rx="7" fill="#1a1a1a"/>
+    <circle cx="18" cy="18" r="14" fill="white"/>
+    <circle cx="18" cy="18" r="11" fill="#1a1a1a"/>
+    <circle cx="18" cy="18" r="8"  fill="white"/>
+    <circle cx="18" cy="18" r="5"  fill="#1a1a1a"/>
+    <circle cx="18" cy="18" r="2"  fill="white"/>
+    <circle cx="18" cy="18" r="1"  fill="#1a1a1a"/>
+  </svg>
   <div>
     <div class="title">Shotmarker Viewer</div>
     <div class="sub">Offline Plot Data</div>
@@ -325,7 +334,17 @@
 
   <!-- Step 2: Load the file -->
   <div class="drop-zone" id="drop-zone">
-    <div class="icon">🎯</div>
+    <div class="icon">
+      <svg width="90" height="72" viewBox="0 0 90 72" xmlns="http://www.w3.org/2000/svg">
+        <rect x="0" y="0" width="90" height="72" rx="6" fill="#1a1a1a" stroke="#555" stroke-width="1.5"/>
+        <circle cx="45" cy="36" r="30" fill="white"/>
+        <circle cx="45" cy="36" r="24" fill="#1a1a1a"/>
+        <circle cx="45" cy="36" r="18" fill="white"/>
+        <circle cx="45" cy="36" r="12" fill="#1a1a1a"/>
+        <circle cx="45" cy="36" r="6"  fill="white"/>
+        <circle cx="45" cy="36" r="3"  fill="#1a1a1a"/>
+      </svg>
+    </div>
     <h2>Step 2 — Load Backup File</h2>
     <p>Tap the button below to select your downloaded<br><strong>SM_backup_*.tar</strong> file</p>
     <label for="file-input" style="display:inline-block;margin-top:16px;background:var(--accent);color:#000;font-weight:700;padding:10px 28px;border-radius:8px;font-size:14px;cursor:pointer;">
@@ -335,7 +354,7 @@
   </div>
   <div id="load-progress"></div>
   <div style="font-size:12px;color:#8e8e93;text-align:center;max-width:420px;line-height:1.5;padding:0 20px;margin-top:8px">
-    ⚠️ Plots are generated from uncorrected Shotmarker coordinate data. Shot positions may not exactly match the recorded score zone due to acoustic measurement artefacts.
+
   </div>
 </div>
 
@@ -350,7 +369,17 @@
 
   <div id="content">
     <div id="empty-state">
-      <div class="big">🎯</div>
+      <div class="big">
+        <svg width="90" height="72" viewBox="0 0 90 72" xmlns="http://www.w3.org/2000/svg">
+          <rect x="0" y="0" width="90" height="72" rx="6" fill="#1a1a1a" stroke="#555" stroke-width="1.5"/>
+          <circle cx="45" cy="36" r="30" fill="white"/>
+          <circle cx="45" cy="36" r="24" fill="#1a1a1a"/>
+          <circle cx="45" cy="36" r="18" fill="white"/>
+          <circle cx="45" cy="36" r="12" fill="#1a1a1a"/>
+          <circle cx="45" cy="36" r="6"  fill="white"/>
+          <circle cx="45" cy="36" r="3"  fill="#1a1a1a"/>
+        </svg>
+      </div>
       <div>Select a session above to view shots</div>
     </div>
 
@@ -360,13 +389,15 @@
     <div id="score-strip" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 14px;width:100%;max-width:660px;">
       <div style="display:flex;gap:16px;align-items:baseline;margin-bottom:8px;flex-wrap:wrap">
         <div id="ss-shots" style="font-size:13px;color:var(--muted)"></div>
-        <div id="ss-total" style="font-size:20px;font-weight:700;color:var(--text)"></div>
         <div style="margin-left:auto;text-align:right">
-          <div id="ss-avg" style="font-size:13px;color:var(--muted)"></div>
+          <div id="ss-avg" style="font-size:13px;color:var(--accent2)"></div>
           <div id="ss-sd" style="font-size:13px;color:var(--muted)"></div>
         </div>
       </div>
-      <div id="ss-grid" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div id="ss-grid" style="display:flex;flex-wrap:wrap;gap:4px;flex:1"></div>
+        <div id="ss-total" style="font-size:28px;font-weight:700;color:#e8a020;white-space:nowrap;padding-left:8px;border-left:1px solid var(--border)"></div>
+      </div>
     </div>
 
     <div id="target-wrap" style="display:none">
@@ -647,7 +678,7 @@ function renderInfo() {
             <div class="glbl">Shots</div>
           </div>
           <div class="garmin-stat">
-            <div class="gval">${Math.round(avg)}</div>
+            <div class="gval avg-hl">${Math.round(avg)}</div>
             <div class="glbl">Avg fps</div>
           </div>
           <div class="garmin-stat">
@@ -666,21 +697,56 @@ function renderInfo() {
             <div class="gval">${Math.round(mn)}</div>
             <div class="glbl">Min fps</div>
           </div>
-          <div class="garmin-stat" style="grid-column:1/-1">
+          <div class="garmin-stat">
             <div class="gval">${ke.toFixed(0)}</div>
-            <div class="glbl">Avg KE (ft·lb)</div>
+            <div class="glbl">Avg KE ft·lb</div>
           </div>
         </div>
       </div>`;
   }
 
   const grp = meta.group ? `<span class="badge gold">${meta.group}</span>` : '';
+
+  let smStatHTML = `
+    <div class="garmin-stat">
+      <div class="gval">${shots.length}</div>
+      <div class="glbl">Shots</div>
+    </div>`;
+
+  if (smVels.length > 1) {
+    const avg = smVels.reduce((a,b)=>a+b,0)/smVels.length;
+    const sd  = Math.sqrt(smVels.map(v=>(v-avg)**2).reduce((a,b)=>a+b,0)/smVels.length);
+    const es  = Math.max(...smVels) - Math.min(...smVels);
+    const mx  = Math.max(...smVels);
+    const mn  = Math.min(...smVels);
+    smStatHTML += `
+      <div class="garmin-stat">
+        <div class="gval avg-hl">${Math.round(avg)}</div>
+        <div class="glbl">Avg fps</div>
+      </div>
+      <div class="garmin-stat">
+        <div class="gval sd-hl">${sd.toFixed(1)}</div>
+        <div class="glbl">Std Dev</div>
+      </div>
+      <div class="garmin-stat">
+        <div class="gval">${Math.round(es)}</div>
+        <div class="glbl">Spread</div>
+      </div>
+      <div class="garmin-stat">
+        <div class="gval">${Math.round(mx)}</div>
+        <div class="glbl">Max fps</div>
+      </div>
+      <div class="garmin-stat">
+        <div class="gval">${Math.round(mn)}</div>
+        <div class="glbl">Min fps</div>
+      </div>`;
+  }
+
   const leftHTML = `
-    <div class="info-top"><h2>${meta.name||'Unnamed'}</h2>${grp}<span class="badge">${meta.face_id}</span></div>
-    <div class="info-sub">${meta.target_name} · ${meta.dist} · ${meta.dateStr} ${meta.time}</div>
-    <div class="stats-row">
-      <div class="stat"><div class="val val-gold">${shots.length}</div><div class="lbl">Shots</div></div>
-      ${velHTML}
+    <div class="garmin-panel">
+      <div class="garmin-panel-title">🎯 ${meta.name||'Unnamed'} ${grp} <span class="badge" style="font-size:9px">${meta.face_id}</span></div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:6px">${meta.target_name} · ${meta.dist} · ${meta.dateStr} ${meta.time}</div>
+      <div class="garmin-grid">${smStatHTML}</div>
     </div>`;
 
   document.getElementById('session-info').innerHTML = garminHTML
