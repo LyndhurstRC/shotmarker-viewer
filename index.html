@@ -153,6 +153,28 @@
   .stat .lbl { font-size: 10px; color: var(--muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.4px; }
   .val-gold { color: var(--accent); }
   .val-blue { color: var(--accent2); }
+  .val-sd { color: #e8a020; font-size: 24px !important; }
+
+  /* Two-column info layout when Garmin data present */
+  .info-cols { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+  .info-col-left { flex: 1; min-width: 0; }
+  .garmin-panel {
+    flex: 0 0 auto; min-width: 168px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 9px; padding: 9px 12px;
+  }
+  .garmin-panel-title {
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.6px; color: var(--muted); margin-bottom: 8px;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .garmin-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px;
+  }
+  .garmin-stat { text-align: center; }
+  .garmin-stat .gval { font-size: 16px; font-weight: 700; line-height: 1; color: var(--text); }
+  .garmin-stat .gval.sd-hl { font-size: 20px; color: #e8a020; }
+  .garmin-stat .glbl { font-size: 9px; color: var(--muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.4px; }
 
   /* TARGET */
   #target-wrap {
@@ -374,7 +396,15 @@
     </div>
 
     <div id="shot-table-wrap" style="display:none">
-      <h3>Shot log — tap row to highlight on target</h3>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:8px">
+        <h3 style="margin:0">Shot log — tap row to highlight on target</h3>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span id="garmin-status" style="font-size:12px;color:var(--muted)"></span>
+          <label id="garmin-btn" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:5px 11px;font-size:12px;cursor:pointer;white-space:nowrap" title="Import Garmin Xero CSV to add fps data">📥 Import Garmin
+            <input type="file" id="garmin-input" accept=".csv" style="display:none">
+          </label>
+        </div>
+      </div>
       <table id="shot-table">
         <thead><tr><th>#</th><th>Score</th><th>X mm</th><th>Y mm</th><th>fps</th></tr></thead>
         <tbody id="shot-tbody"></tbody>
@@ -390,6 +420,7 @@
 let sessions = [], shotData = {}, currentMeta = null, currentShots = [], currentSighters = [];
 let currentId = null, selectedShot = null;
 let allDistances = new Set(), activeDistFilter = null;
+let garminData = {};  // keyed by session id, value = array of {shotNum, fps, time}
 
 // Zoom / pan
 let zoom = 1, panX = 0, panY = 0;
@@ -562,6 +593,12 @@ function openSession(id) {
   document.getElementById('shot-table-wrap').style.display = '';
   document.getElementById('shot-detail').style.display = 'none';
 
+  // Restore garmin status if previously imported for this session
+  const gStatus = garminData[id]
+    ? `✓ Garmin: ${garminData[id].filter(Boolean).length} shots`
+    : '';
+  document.getElementById('garmin-status').textContent = gStatus;
+
   renderInfo();
   renderScoreStrip();
   drawTarget();
@@ -571,24 +608,83 @@ function openSession(id) {
 // ── Session info panel ────────────────────────────────────────────────────────
 function renderInfo() {
   const meta = currentMeta, shots = currentShots;
-  const vels = shots.filter(s=>s.v&&s.v>0).map(s=>s.v);
+
+  // ── Shotmarker velocity stats (from device, stored in m/s → convert to fps) ──
+  const smVels = shots.filter(s => s.v && s.v > 0).map(s => s.v * FPS_CONV);
   let velHTML = '';
-  if (vels.length>1) {
-    const avg = vels.reduce((a,b)=>a+b,0)/vels.length;
-    const sd = Math.sqrt(vels.map(v=>(v-avg)**2).reduce((a,b)=>a+b,0)/vels.length);
-    const es = Math.max(...vels)-Math.min(...vels);
-    velHTML = `<div class="stat"><div class="val val-blue">${Math.round(avg)}</div><div class="lbl">avg fps</div></div>
+  if (smVels.length > 1) {
+    const avg = smVels.reduce((a,b)=>a+b,0)/smVels.length;
+    const sd  = Math.sqrt(smVels.map(v=>(v-avg)**2).reduce((a,b)=>a+b,0)/smVels.length);
+    const es  = Math.max(...smVels) - Math.min(...smVels);
+    velHTML = `
+      <div class="stat"><div class="val val-blue">${Math.round(avg)}</div><div class="lbl">avg fps</div></div>
       <div class="stat"><div class="val">${sd.toFixed(1)}</div><div class="lbl">SD</div></div>
       <div class="stat"><div class="val">${Math.round(es)}</div><div class="lbl">ES</div></div>`;
   }
+
+  // ── Garmin panel ──
+  let garminHTML = '';
+  const gArr = garminData[currentId];
+  if (gArr && gArr.some(Boolean)) {
+    const gVels = gArr.filter(Boolean).map(g => g.fps);
+    const n    = gVels.length;
+    const avg  = gVels.reduce((a,b)=>a+b,0) / n;
+    const sd   = Math.sqrt(gVels.map(v=>(v-avg)**2).reduce((a,b)=>a+b,0) / n);
+    const mx   = Math.max(...gVels);
+    const mn   = Math.min(...gVels);
+    const sprd = mx - mn;
+    // Kinetic energy: KE (ft·lb) = 0.5 * mass_grains * v² / 450380
+    const grains = gArr._bulletWeight || shotData[currentId]?.bullet_weight || 155.5;
+    const ke = 0.5 * grains * avg * avg / 450380;
+
+    garminHTML = `
+      <div class="garmin-panel">
+        <div class="garmin-panel-title">📡 Garmin Xero</div>
+        <div class="garmin-grid">
+          <div class="garmin-stat">
+            <div class="gval">${n}</div>
+            <div class="glbl">Shots</div>
+          </div>
+          <div class="garmin-stat">
+            <div class="gval">${Math.round(avg)}</div>
+            <div class="glbl">Avg fps</div>
+          </div>
+          <div class="garmin-stat">
+            <div class="gval sd-hl">${sd.toFixed(1)}</div>
+            <div class="glbl">Std Dev</div>
+          </div>
+          <div class="garmin-stat">
+            <div class="gval">${Math.round(sprd)}</div>
+            <div class="glbl">Spread</div>
+          </div>
+          <div class="garmin-stat">
+            <div class="gval">${Math.round(mx)}</div>
+            <div class="glbl">Max fps</div>
+          </div>
+          <div class="garmin-stat">
+            <div class="gval">${Math.round(mn)}</div>
+            <div class="glbl">Min fps</div>
+          </div>
+          <div class="garmin-stat" style="grid-column:1/-1">
+            <div class="gval">${ke.toFixed(0)}</div>
+            <div class="glbl">Avg KE (ft·lb)</div>
+          </div>
+        </div>
+      </div>`;
+  }
+
   const grp = meta.group ? `<span class="badge gold">${meta.group}</span>` : '';
-  document.getElementById('session-info').innerHTML = `
+  const leftHTML = `
     <div class="info-top"><h2>${meta.name||'Unnamed'}</h2>${grp}<span class="badge">${meta.face_id}</span></div>
     <div class="info-sub">${meta.target_name} · ${meta.dist} · ${meta.dateStr} ${meta.time}</div>
     <div class="stats-row">
       <div class="stat"><div class="val val-gold">${shots.length}</div><div class="lbl">Shots</div></div>
       ${velHTML}
     </div>`;
+
+  document.getElementById('session-info').innerHTML = garminHTML
+    ? `<div class="info-cols"><div class="info-col-left">${leftHTML}</div>${garminHTML}</div>`
+    : leftHTML;
 }
 
 // ── Score strip ───────────────────────────────────────────────────────────────
@@ -611,8 +707,13 @@ function renderScoreStrip() {
   else if (vCount > 0) totalStr += `-${vCount}V`;
   document.getElementById('ss-total').textContent = totalStr;
 
-  // Velocity avg & SD
-  const vels = shots.filter(s => s.v && s.v > 0).map(s => s.v);
+  // Velocity avg & SD — Garmin takes priority, Shotmarker v is in m/s
+  const vels = shots.map((s,i) => {
+    const g = getGarminFps(i);
+    if (g) return g;
+    if (s.v && s.v > 0) return s.v * FPS_CONV;
+    return null;
+  }).filter(Boolean);
   if (vels.length > 1) {
     const avg = vels.reduce((a,b)=>a+b,0)/vels.length;
     const sd = Math.sqrt(vels.map(v=>(v-avg)**2).reduce((a,b)=>a+b,0)/vels.length);
@@ -760,16 +861,16 @@ function drawTarget() {
     ctx.stroke();
   });
 
-  // Zone labels
+  // Zone labels — uniform font size based on the second ring width
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = currentTheme.label;
   const bounds = [0, ...td.r];
+  const labelFs = Math.max(10, Math.round((bounds[2] - bounds[1]) * sc * 0.70));
+  ctx.font = `bold ${labelFs}px -apple-system,sans-serif`;
   for (let i = 0; i < td.l.length; i++) {
     if (td.r[i] > displayR + 0.5) break;
     const mid = (bounds[i] + td.r[i]) / 2 * sc;
-    const fs  = Math.max(10, Math.round(mid * 0.35));
-    ctx.font = `bold ${fs}px -apple-system,sans-serif`;
     if (i === 0) {
       ctx.fillText(td.l[i], cx, cy);
     } else {
@@ -876,8 +977,13 @@ function saveImage() {
   ctx.textAlign = 'right';
   ctx.fillText(totalStr, dispW - PAD, PAD);
 
-  // Velocity stats
-  const vels = shots.filter(s => s.v && s.v > 0).map(s => s.v);
+  // Velocity stats — Garmin priority, Shotmarker v in m/s
+  const vels = shots.map((s,i) => {
+    const g = getGarminFps(i);
+    if (g) return g;
+    if (s.v && s.v > 0) return s.v * FPS_CONV;
+    return null;
+  }).filter(Boolean);
   if (vels.length > 1) {
     const avg = vels.reduce((a,b)=>a+b,0)/vels.length;
     const sd = Math.sqrt(vels.map(v=>(v-avg)**2).reduce((a,b)=>a+b,0)/vels.length);
@@ -1053,7 +1159,9 @@ function highlightShot(idx) {
   document.getElementById('sd-num').textContent = `Shot #${idx+1}`;
   document.getElementById('sd-score').innerHTML = `<span class="sc-pill">${sc}</span>`;
   document.getElementById('sd-xy').textContent = `X: ${s.x?.toFixed(1)} mm   Y: ${s.y?.toFixed(1)} mm`;
-  document.getElementById('sd-vel').textContent = s.v ? `${Math.round(s.v)} fps` : '';
+  const fps = resolvedFps(s, idx);
+  const src = resolvedFpsSource(s, idx);
+  document.getElementById('sd-vel').textContent = fps ? `${fps} fps${src==='garmin'?' (Garmin)':''}` : '';
   document.querySelectorAll('#shot-tbody tr').forEach((tr,i) => tr.classList.toggle('hl', i===idx));
   const rows = document.querySelectorAll('#shot-tbody tr');
   if (rows[idx]) rows[idx].scrollIntoView({ block:'nearest', behavior:'smooth' });
@@ -1072,17 +1180,149 @@ function clearHighlight() {
 }
 
 // ── Shot table ────────────────────────────────────────────────────────────────
+// ── Garmin Xero CSV import ────────────────────────────────────────────────────
+document.getElementById('garmin-input').addEventListener('change', e => {
+  if (e.target.files[0]) importGarmin(e.target.files[0]);
+  e.target.value = '';  // allow re-selecting same file
+});
+
+function parseGarminCSV(text) {
+  // Normalise line endings and strip BOM
+  text = text.replace(/\uFEFF/g, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const lines = text.split('\n');
+
+  // Parse session date from "DATE, "9 May 2026 at 6:42 pm""
+  let sessionDate = null;
+  for (const line of lines) {
+    const m = line.match(/^DATE,\s*"?(\d+\s+\w+\s+\d{4}\s+at\s+[\d:]+\s*[apm]+)"?/i);
+    if (m) {
+      const cleaned = m[1].replace(' at ', ' ').replace(/\s+/g,' ').trim();
+      sessionDate = new Date(cleaned);
+      break;
+    }
+  }
+
+  // Parse bullet weight
+  let bulletWeight = null;
+  for (const line of lines) {
+    const m = line.match(/^PROJECTILE WEIGHT\(GRAINS\),\s*([\d.]+)/i);
+    if (m) { bulletWeight = parseFloat(m[1]); break; }
+  }
+
+  // Parse shot rows: #,SPEED,Δ AVG,KE,PF,TIME,...
+  const shots = [];
+  let inShots = false;
+  for (const line of lines) {
+    if (line.startsWith('#,SPEED')) { inShots = true; continue; }
+    if (!inShots) continue;
+    if (!line.trim() || line.startsWith('-') || line.startsWith('AVERAGE') ||
+        line.startsWith('STD') || line.startsWith('SPREAD') || line.startsWith('SESSION') ||
+        line.startsWith('PROJEC') || line.startsWith('AVG') || line.startsWith('DATE') ||
+        line.startsWith('All')) continue;
+
+    const cols = line.split(',').map(c => c.trim());
+    const num = parseInt(cols[0]);
+    const fps = parseFloat(cols[1]);
+    const timeStr = cols[5];  // e.g. "2:16:35 pm"
+    if (isNaN(num) || isNaN(fps) || !timeStr) continue;
+
+    // Build full Date from session date + shot time
+    let shotDate = null;
+    if (sessionDate) {
+      const tm = timeStr.match(/(\d+):(\d+):(\d+)\s*(am|pm)/i);
+      if (tm) {
+        let h = parseInt(tm[1]), min = parseInt(tm[2]), sec = parseInt(tm[3]);
+        const ampm = tm[4].toLowerCase();
+        if (ampm === 'pm' && h !== 12) h += 12;
+        if (ampm === 'am' && h === 12) h = 0;
+        shotDate = new Date(sessionDate);
+        shotDate.setHours(h, min, sec, 0);
+      }
+    }
+    shots.push({ shotNum: num, fps, timeStr, ts: shotDate ? shotDate.getTime() : null });
+  }
+  return { sessionDate, shots, bulletWeight };
+}
+
+function importGarmin(file) {
+  if (!currentId) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const { sessionDate, shots, bulletWeight } = parseGarminCSV(e.target.result);
+    if (!shots.length) {
+      showToast('No shot data found in CSV');
+      return;
+    }
+
+    const smShots = currentShots;
+    const matched = matchGarminShots(smShots, shots);
+
+    // Store matched shots and bullet weight
+    garminData[currentId] = matched;
+    garminData[currentId]._bulletWeight = bulletWeight;
+    const count = matched.filter(m => m !== null).length;
+
+    document.getElementById('garmin-status').textContent =
+      `✓ Garmin: ${count}/${smShots.length} shots matched`;
+
+    renderInfo();
+    renderScoreStrip();
+    renderTable();
+    drawTarget();
+    showToast(`Garmin data imported — ${count} shots matched`);
+  };
+  reader.readAsText(file);
+}
+
+function matchGarminShots(smShots, garminShots) {
+  // Shotmarker timestamps are device-relative (not wall-clock), so we always
+  // match by shot order. Shot 1 in the Garmin CSV = shot 1 in the Shotmarker session.
+  const result = new Array(smShots.length).fill(null);
+  for (let i = 0; i < Math.min(smShots.length, garminShots.length); i++) {
+    result[i] = garminShots[i];
+  }
+  return result;
+}
+
+function getGarminFps(shotIndex) {
+  if (!currentId || !garminData[currentId]) return null;
+  const g = garminData[currentId][shotIndex];
+  return g ? g.fps : null;
+}
+
+const FPS_CONV = 3.28084; // m/s to fps
+
+function resolvedFps(shot, index) {
+  // Garmin takes priority when imported (dedicated chrono)
+  const gfps = getGarminFps(index);
+  if (gfps) return Math.round(gfps);
+  // Shotmarker v is in m/s — convert to fps
+  if (shot.v && shot.v > 0) return Math.round(shot.v * FPS_CONV);
+  return null;
+}
+
+function resolvedFpsSource(shot, index) {
+  if (getGarminFps(index)) return 'garmin';
+  if (shot.v && shot.v > 0) return 'sm';
+  return 'none';
+}
+
 function renderTable() {
   const shots=currentShots, sighters=currentSighters;
   let html = shots.map((s,i) => {
     const sc=String(s.score??'?');
     const lbl = s.display_text != null ? String(s.display_text) : String(i+1);
+    const fps = resolvedFps(s, i);
+    const src = resolvedFpsSource(s, i);
+    const fpsCell = fps
+      ? `${fps}<span style="font-size:9px;opacity:0.45;margin-left:2px">${src==='garmin'?'G':''}</span>`
+      : '-';
     return `<tr onclick="highlightShot(${i})">
       <td style="color:var(--muted);font-weight:600">${lbl}</td>
       <td><span class="sc-pill">${sc}</span></td>
       <td>${s.x!=null?s.x.toFixed(1):'-'}</td>
       <td>${s.y!=null?s.y.toFixed(1):'-'}</td>
-      <td>${s.v?Math.round(s.v):'-'}</td>
+      <td>${fpsCell}</td>
     </tr>`;
   }).join('');
   if (sighters.length) {
