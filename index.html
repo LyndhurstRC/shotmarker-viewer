@@ -655,26 +655,26 @@ function renderScoreStrip() {
 // IS targets: V ring = central bull (superV scores same as V)
 // IFX targets: X = superV ring, 6 = central bull
 // ── Official ICFRA target ring radii (mm from centre) ────────────────────────
+// ── Ring definitions from Shotmarker software targetfaces.js ─────────────────
+// r = scoring boundary radii in mm = (diam/2 + line/2) — outer edge of ring line
+// board = target face size in mm
+// l = score labels innermost outward
 const OFFICIAL_RINGS = {
-  'IS300m':  { r:[ 35,   70,  140,  210,  300,  600], l:['V','5','4','3','2','1'] },
-  'IS500m':  { r:[ 72.5, 145, 330,  500,  660,  900], l:['V','5','4','3','2','1'] },
-  'IS500y':  { r:[ 65,   130, 300,  457.5,660,  900], l:['V','5','4','3','2','1'] },
-  'IS600m':  { r:[ 80,   160, 330,  500,  660,  900], l:['V','5','4','3','2','1'] },
-  'IS600y':  { r:[ 72.5, 145, 300,  457.5,660,  900], l:['V','5','4','3','2','1'] },
-  'ISLR':    { r:[127.5, 255, 407.5, 560, 915, 1200], l:['V','5','4','3','2','1'] },
-  'UKTR300': { r:[ 35,   70,  140,  210,  300,  600], l:['V','5','4','3','2','1'] },
-  'IFX300m': { r:[ 17.5,  35,  70,  140,  210,  300], l:['X','6','5','4','3','2'] },
-  'IFX500m': { r:[ 36,  72.5, 145,  330,  500,  660], l:['X','6','5','4','3','2'] },
-  'IFX500y': { r:[ 32.5,  65, 130,  300, 457.5, 660], l:['X','6','5','4','3','2'] },
-  'IFX600m': { r:[ 40,    80, 160,  330,  500,  660], l:['X','6','5','4','3','2'] },
-  'IFX600y': { r:[ 36,  72.5, 145,  300, 457.5, 660], l:['X','6','5','4','3','2'] },
-  'IFXLR':   { r:[ 63.5,127.5,255, 407.5, 560,  915], l:['X','6','5','4','3','2'] },
+  'IS300m':  { board:{w:1200,h:1200}, r:[37,72,142,212,300],     l:['V','5','4','3','2'] },
+  'IS500m':  { board:{w:1800,h:1800}, r:[75.5,148,333,500,663],  l:['V','5','4','3','2'] },
+  'IS500y':  { board:{w:1800,h:1800}, r:[68,133,303,457.5,663],  l:['V','5','4','3','2'] },
+  'IS600y':  { board:{w:1800,h:1800}, r:[75.5,148,303,457.5,663],l:['V','5','4','3','2'] },
+  'IS600m':  { board:{w:1800,h:1800}, r:[83,163,333,500,663],    l:['V','5','4','3','2'] },
+  'ISLR':    { board:{w:2400,h:1800}, r:[133.5,261,413.5,560,921],l:['V','5','4','3','2'] },
+  'UKTR300': { board:{w:1200,h:1200}, r:[37,72,142,212,300],     l:['V','5','4','3','2'] },
+  'IFX300m': { board:{w:1200,h:1200}, r:[18.5,37,72,142,212,300],l:['X','6','5','4','3','2'] },
+  'IFX500m': { board:{w:1800,h:1800}, r:[37.5,75.5,148,333,500,663],l:['X','6','5','4','3','2'] },
+  'IFX500y': { board:{w:1800,h:1800}, r:[33.5,68,133,303,457.5,663],l:['X','6','5','4','3','2'] },
+  'IFX600y': { board:{w:1800,h:1800}, r:[37.5,75.5,148,303,457.5,663],l:['X','6','5','4','3','2'] },
+  'IFX600m': { board:{w:1800,h:1800}, r:[41.5,83,163,333,500,663],l:['X','6','5','4','3','2'] },
+  'IFXLR':   { board:{w:2400,h:1800}, r:[67.5,133.5,261,413.5,560,921],l:['X','6','5','4','3','2'] },
 };
 
-// Calculate sc (pixels per mm) by finding the official ring that contains
-// the outermost shot, then scaling so that ring fills 85% of canvas.
-// Rings drawn at official mm radii * sc — shots plotted at x/y mm * sc.
-// Both use identical sc so they are always consistent.
 function getTargetDef(faceId) {
   return OFFICIAL_RINGS[faceId] || null;
 }
@@ -742,9 +742,11 @@ function drawTarget() {
   const cx = W / 2 + panX;
   const cy = W / 2 + panY;
 
-  // Grey target background
+  // Grey target background — use actual board dimensions from Shotmarker
+  const bw = (td.board ? td.board.w : displayR*2) * sc;
+  const bh = (td.board ? td.board.h : displayR*2) * sc;
   ctx.fillStyle = currentTheme.target;
-  ctx.fillRect(cx - displayR*sc, cy - displayR*sc, displayR*sc*2, displayR*sc*2);
+  ctx.fillRect(cx - bw/2, cy - bh/2, bw, bh);
 
   // Draw rings — r * sc = pixel radius from centre
   ctx.strokeStyle = currentTheme.ring;
