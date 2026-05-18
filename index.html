@@ -1296,7 +1296,7 @@ function resolvedFps(shot, index) {
   // Garmin takes priority when imported (dedicated chrono)
   const gfps = getGarminFps(index);
   if (gfps) return Math.round(gfps);
-  // Shotmarker v is in m/s — convert to fps
+  // Fall back to Shotmarker v (stored in m/s → convert to fps)
   if (shot.v && shot.v > 0) return Math.round(shot.v * FPS_CONV);
   return null;
 }
@@ -1309,7 +1309,25 @@ function resolvedFpsSource(shot, index) {
 
 function renderTable() {
   const shots=currentShots, sighters=currentSighters;
-  let html = shots.map((s,i) => {
+  let html = '';
+
+  // Sighters first, at the top
+  if (sighters.length) {
+    html += sighters.map((s,i) => {
+      const lbl = s.display_text != null ? String(s.display_text) : `S${i+1}`;
+      const fps = s.v && s.v > 0 ? Math.round(s.v * FPS_CONV) : '-';
+      return `<tr style="opacity:0.5">
+        <td style="color:var(--muted)">${lbl}</td>
+        <td><span class="sc-pill" style="background:#444">—</span></td>
+        <td>${s.x!=null?s.x.toFixed(1):'-'}</td>
+        <td>${s.y!=null?s.y.toFixed(1):'-'}</td>
+        <td>${fps}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  // Scored shots after
+  html += shots.map((s,i) => {
     const sc=String(s.score??'?');
     const lbl = s.display_text != null ? String(s.display_text) : String(i+1);
     const fps = resolvedFps(s, i);
@@ -1325,18 +1343,7 @@ function renderTable() {
       <td>${fpsCell}</td>
     </tr>`;
   }).join('');
-  if (sighters.length) {
-    html += sighters.map((s,i) => {
-      const lbl = s.display_text != null ? String(s.display_text) : `S${i+1}`;
-      return `<tr style="opacity:0.5">
-        <td style="color:var(--muted)">${lbl}</td>
-        <td><span class="sc-pill" style="background:#444">—</span></td>
-        <td>${s.x!=null?s.x.toFixed(1):'-'}</td>
-        <td>${s.y!=null?s.y.toFixed(1):'-'}</td>
-        <td>${s.v?Math.round(s.v):'-'}</td>
-      </tr>`;
-    }).join('');
-  }
+
   document.getElementById('shot-tbody').innerHTML = html;
 }
 
