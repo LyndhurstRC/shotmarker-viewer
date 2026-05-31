@@ -438,7 +438,7 @@
         </div>
       </div>
       <table id="shot-table">
-        <thead><tr><th>#</th><th>Score</th><th>X mm</th><th>Y mm</th><th>fps</th></tr></thead>
+        <thead><tr><th>#</th><th>Score</th><th>Interval</th><th>fps</th><th>X mm</th><th>Y mm</th></tr></thead>
         <tbody id="shot-tbody"></tbody>
       </table>
     </div>
@@ -1484,8 +1484,18 @@ function resolvedFpsSource(shot, index) {
   return 'none';
 }
 
+function formatInterval(ms) {
+  if (ms == null || ms <= 0) return '-';
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60), rem = s % 60;
+  return `${m}m ${rem}s`;
+}
+
 function renderTable() {
   const shots=currentShots, sighters=currentSighters;
+  // Build combined ordered list for interval calculation: sighters first, then shots
+  const allOrdered = [...sighters, ...shots];
   let html = '';
 
   // Sighters first, at the top
@@ -1493,12 +1503,15 @@ function renderTable() {
     html += sighters.map((s,i) => {
       const lbl = s.display_text != null ? String(s.display_text) : `S${i+1}`;
       const fps = s.v && s.v > 0 ? Math.round(s.v * FPS_CONV) : '-';
+      const prev = allOrdered[i - 1];
+      const interval = (prev?.ts && s.ts) ? formatInterval(s.ts - prev.ts) : '-';
       return `<tr style="opacity:0.5">
         <td style="color:var(--muted)">${lbl}</td>
         <td><span class="sc-pill" style="background:#444">—</span></td>
+        <td style="color:var(--muted);font-size:11px">${interval}</td>
+        <td>${fps}</td>
         <td>${s.x!=null?s.x.toFixed(1):'-'}</td>
         <td>${s.y!=null?s.y.toFixed(1):'-'}</td>
-        <td>${fps}</td>
       </tr>`;
     }).join('');
   }
@@ -1512,12 +1525,16 @@ function renderTable() {
     const fpsCell = fps
       ? `${fps}<span style="font-size:9px;opacity:0.45;margin-left:2px">${src==='garmin'?'G':''}</span>`
       : '-';
+    const orderIdx = sighters.length + i;
+    const prev = allOrdered[orderIdx - 1];
+    const interval = (prev?.ts && s.ts) ? formatInterval(s.ts - prev.ts) : '-';
     return `<tr onclick="highlightShot(${i})">
       <td style="color:var(--muted);font-weight:600">${lbl}</td>
       <td><span class="sc-pill">${sc}</span></td>
+      <td style="color:var(--muted);font-size:11px">${interval}</td>
+      <td>${fpsCell}</td>
       <td>${s.x!=null?s.x.toFixed(1):'-'}</td>
       <td>${s.y!=null?s.y.toFixed(1):'-'}</td>
-      <td>${fpsCell}</td>
     </tr>`;
   }).join('');
 
