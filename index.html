@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -255,6 +254,12 @@
   #shot-table { width: 100%; border-collapse: collapse; font-size: 13px; }
   #shot-table th { padding: 7px 12px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); background: var(--surface2); }
   #shot-table td { padding: 7px 12px; border-top: 1px solid var(--border); cursor: pointer; }
+  #shot-table tr.excluded td { opacity: 0.35; text-decoration: line-through; }
+  #shot-table tr.excluded td:last-child { text-decoration: none; }
+  .excl-btn { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 14px; padding: 0 2px; line-height: 1; }
+  .excl-btn:hover { color: #e03030; }
+  tr.excluded .excl-btn { color: #2a7a3b; }
+  tr.excluded .excl-btn:hover { color: #4caf50; }
   #shot-table tr.hl td { background: rgba(232,160,32,0.12); }
   #shot-table tr:hover td { background: rgba(255,255,255,0.04); }
 
@@ -449,7 +454,7 @@
         </div>
       </div>
       <table id="shot-table">
-        <thead><tr><th>#</th><th>Score</th><th>Interval</th><th>fps</th><th>X mm</th><th>Y mm</th></tr></thead>
+        <thead><tr><th>#</th><th>Score</th><th>Interval</th><th>fps</th><th>X mm</th><th>Y mm</th><th></th></tr></thead>
         <tbody id="shot-tbody"></tbody>
       </table>
     </div>
@@ -464,6 +469,7 @@ let sessions = [], shotData = {}, currentMeta = null, currentShots = [], current
 let currentId = null, selectedShot = null;
 let allDistances = new Set(), activeDistFilter = null;
 let garminData = {};  // keyed by session id, value = array of {shotNum, fps, time}
+let excludedShots = {};  // keyed by session id, value = Set of shot indices
 
 // Zoom / pan
 let zoom = 1, panX = 0, panY = 0;
@@ -721,7 +727,7 @@ function velSparklineFullWidth(vels, h) {
 
 // ── Session info panel ────────────────────────────────────────────────────────
 function renderInfo() {
-  const meta = currentMeta, shots = currentShots;
+  const meta = currentMeta, shots = activeShots();
   const data = shotData[currentId];
 
   // ── Shotmarker velocity stats (from device, stored in m/s → convert to fps) ──
@@ -731,7 +737,7 @@ function renderInfo() {
   let moaHTML = '';
   if (shots.length >= 2 && data?.dist) {
     const distMm = distToMm(data.dist, data.dist_unit || 'm');
-    const moa = calcGroupMOA(shots, distMm);
+    const moa = calcGroupMOA(activeShots(), distMm);
     if (moa !== null) {
       moaHTML = `
         <div class="garmin-stat">
@@ -745,7 +751,10 @@ function renderInfo() {
   let garminHTML = '';
   const gArr = garminData[currentId];
   if (gArr && gArr.some(Boolean)) {
-    const gVels = gArr.filter(Boolean).map(g => g.fps);
+    // Only include fps for shots that are not excluded
+    const gVels = gArr.map((g, i) => (!isExcluded(i) && g) ? g.fps : null).filter(Boolean);
+    if (!gVels.length) { garminHTML = ''; }
+    else {
     const n    = gVels.length;
     const avg  = gVels.reduce((a,b)=>a+b,0) / n;
     const sd   = Math.sqrt(gVels.map(v=>(v-avg)**2).reduce((a,b)=>a+b,0) / n);
@@ -794,6 +803,7 @@ function renderInfo() {
           ${spark}
         </div>` : ''}
       </div>`;
+    } // end else (gVels.length > 0)
   }
 
   const grp = meta.group ? `<span class="badge gold">${meta.group}</span>` : '';
@@ -848,7 +858,8 @@ function renderInfo() {
 
 // ── Score strip ───────────────────────────────────────────────────────────────
 function renderScoreStrip() {
-  const shots = currentShots, sighters = currentSighters;
+  const shots = activeShots(), sighters = currentSighters;
+  const allShots = currentShots; // used for grid display (shows excluded greyed)
 
   // Shot count
   document.getElementById('ss-shots').textContent = `${shots.length} shots`;
@@ -896,15 +907,17 @@ function renderScoreStrip() {
     cell.title = `Sighter ${i+1}`;
     grid.appendChild(cell);
   });
-  shots.forEach((s, i) => {
+  allShots.forEach((s, i) => {
     const cell = document.createElement('div');
-    cell.className = 'ss-cell' + (i === selectedShot ? ' hl' : '');
+    const excl = isExcluded(i);
+    cell.className = 'ss-cell' + (i === selectedShot && !excl ? ' hl' : '');
+    if (excl) cell.style.opacity = '0.25';
     const lbl = s.display_text != null ? String(s.display_text) : String(i+1);
-    cell.innerHTML = `<span style="font-size:9px;font-weight:400;opacity:0.6;line-height:1">${lbl}</span><span style="line-height:1">${String(s.score ?? '?')}</span>`;
+    cell.innerHTML = `<span style="font-size:9px;font-weight:400;opacity:0.6;line-height:1">${lbl}</span><span style="line-height:1${excl?' text-decoration:line-through':''}">${String(s.score ?? '?')}</span>`;
     cell.style.flexDirection = 'column';
     cell.style.gap = '1px';
     cell.style.height = '36px';
-    cell.title = `Shot ${lbl}`;
+    cell.title = excl ? `Shot ${lbl} (excluded)` : `Shot ${lbl}`;
     cell.onclick = () => highlightShot(i);
     grid.appendChild(cell);
   });
@@ -998,7 +1011,9 @@ function drawTarget() {
 
   // Get ring boundaries from this session's score data
   const allShots = [...currentShots, ...currentSighters].filter(s => s.x != null);
-  const { sc, displayR, td } = calcScale(currentMeta.face_id, allShots, W, zoom);
+  const activeOnly = activeShots().filter(s => s.x != null);
+  const scaleShots = activeOnly.length ? activeOnly : allShots;
+  const { sc, displayR, td } = calcScale(currentMeta.face_id, scaleShots, W, zoom);
   if (!td) { ctx.restore(); return; }
 
   const cx = W / 2 + panX;
@@ -1054,18 +1069,30 @@ function drawTarget() {
     if (s.x == null) return;
     const px = cx + (s.x + cal_x) * sc, py = cy - (s.y + cal_y) * sc;
     if (px < -DOT || px > W+DOT || py < -DOT || py > W+DOT) return;
-    if (i === selectedShot) {
+    const excl = isExcluded(i);
+    if (i === selectedShot && !excl) {
       ctx.beginPath();
       ctx.arc(px, py, DOT + Math.max(3, DOT*0.5), 0, Math.PI*2);
       ctx.fillStyle = currentTheme.hl;
       ctx.fill();
     }
     const lbl = s.display_text != null ? String(s.display_text) : String(i+1);
-    dot(ctx, px, py, DOT, currentTheme.dot, currentTheme.dotS, lbl, nfs, currentTheme.num);
+    if (excl) {
+      // Hollow circle for excluded shots
+      ctx.beginPath();
+      ctx.arc(px, py, DOT, 0, Math.PI*2);
+      ctx.strokeStyle = currentTheme.dot;
+      ctx.lineWidth = 1.5;
+      ctx.globalAlpha = 0.3;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    } else {
+      dot(ctx, px, py, DOT, currentTheme.dot, currentTheme.dotS, lbl, nfs, currentTheme.num);
+    }
   });
 
-  // Red cross at group centroid
-  const validShots = currentShots.filter(s => s.x != null);
+  // Red cross at group centroid — active shots only
+  const validShots = activeShots().filter(s => s.x != null);
   if (validShots.length > 1) {
     const mx = validShots.reduce((a,s) => a + s.x + cal_x, 0) / validShots.length;
     const my = validShots.reduce((a,s) => a + s.y + cal_y, 0) / validShots.length;
@@ -1369,7 +1396,30 @@ function clearHighlight() {
 }
 
 // ── Shot table ────────────────────────────────────────────────────────────────
-// ── Garmin Xero CSV import ────────────────────────────────────────────────────
+// ── Shot exclusion ────────────────────────────────────────────────────────────
+function isExcluded(index) {
+  return excludedShots[currentId]?.has(index) || false;
+}
+
+function toggleExclude(index) {
+  if (!excludedShots[currentId]) excludedShots[currentId] = new Set();
+  if (excludedShots[currentId].has(index)) {
+    excludedShots[currentId].delete(index);
+  } else {
+    excludedShots[currentId].add(index);
+    if (selectedShot === index) { selectedShot = null; }
+  }
+  renderInfo();
+  renderScoreStrip();
+  renderTable();
+  drawTarget();
+}
+
+function activeShots() {
+  return currentShots.filter((_, i) => !isExcluded(i));
+}
+
+
 document.getElementById('garmin-input').addEventListener('change', e => {
   if (e.target.files[0]) importGarmin(e.target.files[0]);
   e.target.value = '';  // allow re-selecting same file
@@ -1446,9 +1496,19 @@ function importGarmin(file) {
     const smShots = currentShots;
     const matched = matchGarminShots(smShots, shots);
 
-    // Store matched shots and bullet weight
+    // Also store sighter fps — they sit at the start of the Garmin sequence
+    const rawShots = shotData[currentId]?.shots || [];
+    let sighterOffset = 0;
+    for (const s of rawShots) {
+      if (s.sighter || String(s.display_text || '').startsWith('S')) sighterOffset++;
+      else break;
+    }
+    const sighterFps = shots.slice(0, sighterOffset).map(g => g ? g.fps : null);
+
+    // Store matched shots, sighter fps and bullet weight
     garminData[currentId] = matched;
     garminData[currentId]._bulletWeight = bulletWeight;
+    garminData[currentId]._sighterFps = sighterFps;
     const count = matched.filter(m => m !== null).length;
 
     document.getElementById('garmin-status').textContent =
@@ -1464,11 +1524,25 @@ function importGarmin(file) {
 }
 
 function matchGarminShots(smShots, garminShots) {
-  // Shotmarker timestamps are device-relative (not wall-clock), so we always
-  // match by shot order. Shot 1 in the Garmin CSV = shot 1 in the Shotmarker session.
+  // Garmin records every trigger pull in order with no sighter labels.
+  // Count how many shots in the raw session data come before the first scored shot
+  // — this is the true offset into the Garmin sequence.
+  const rawShots = shotData[currentId]?.shots || [];
+  let sighterOffset = 0;
+  for (const s of rawShots) {
+    if (s.sighter || String(s.display_text || '').startsWith('S')) {
+      sighterOffset++;
+    } else {
+      break; // stop at the first scored shot
+    }
+  }
+
   const result = new Array(smShots.length).fill(null);
-  for (let i = 0; i < Math.min(smShots.length, garminShots.length); i++) {
-    result[i] = garminShots[i];
+  for (let i = 0; i < smShots.length; i++) {
+    const garminIdx = sighterOffset + i;
+    if (garminIdx < garminShots.length) {
+      result[i] = garminShots[garminIdx];
+    }
   }
   return result;
 }
@@ -1512,9 +1586,15 @@ function renderTable() {
 
   // Sighters first, at the top
   if (sighters.length) {
+    const sighterFps = garminData[currentId]?._sighterFps || [];
     html += sighters.map((s,i) => {
       const lbl = s.display_text != null ? String(s.display_text) : `S${i+1}`;
-      const fps = s.v && s.v > 0 ? Math.round(s.v * FPS_CONV) : '-';
+      let fps = '-';
+      if (sighterFps[i]) {
+        fps = `${Math.round(sighterFps[i])}<span style="font-size:9px;opacity:0.45;margin-left:2px">G</span>`;
+      } else if (s.v && s.v > 0) {
+        fps = String(Math.round(s.v * FPS_CONV));
+      }
       const prev = allOrdered[i - 1];
       const interval = (prev?.ts && s.ts) ? formatInterval(s.ts - prev.ts) : '-';
       return `<tr style="opacity:0.5">
@@ -1524,6 +1604,7 @@ function renderTable() {
         <td>${fps}</td>
         <td>${s.x!=null?s.x.toFixed(1):'-'}</td>
         <td>${s.y!=null?s.y.toFixed(1):'-'}</td>
+        <td></td>
       </tr>`;
     }).join('');
   }
@@ -1540,13 +1621,17 @@ function renderTable() {
     const orderIdx = sighters.length + i;
     const prev = allOrdered[orderIdx - 1];
     const interval = (prev?.ts && s.ts) ? formatInterval(s.ts - prev.ts) : '-';
-    return `<tr onclick="highlightShot(${i})">
+    const excl = isExcluded(i);
+    const exclIcon = excl ? '↩' : '✕';
+    const exclTitle = excl ? 'Re-include shot' : 'Exclude shot';
+    return `<tr class="${excl?'excluded':''}" onclick="highlightShot(${i})">
       <td style="color:var(--muted);font-weight:600">${lbl}</td>
       <td><span class="sc-pill">${sc}</span></td>
       <td style="color:var(--muted);font-size:11px">${interval}</td>
       <td>${fpsCell}</td>
       <td>${s.x!=null?s.x.toFixed(1):'-'}</td>
       <td>${s.y!=null?s.y.toFixed(1):'-'}</td>
+      <td><button class="excl-btn" title="${exclTitle}" onclick="event.stopPropagation();toggleExclude(${i})">${exclIcon}</button></td>
     </tr>`;
   }).join('');
 
