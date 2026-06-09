@@ -1749,6 +1749,54 @@ function renderDiagnostics() {
   const dropoutShots  = shots.filter(s => s.t.some(v=>v===-1)).length;
   const criticalShots = shots.filter(s => CRIT.some(i=>s.t[i]===-1)).length;
 
+  // ── Data summary table (all targets) ──
+  const summaryTableHTML = (() => {
+    const allLabels = Object.keys(shotData).reduce((s, id) => {
+      const l = shotData[id].label; if (l) s.add(l); return s;
+    }, new Set());
+    const sorted = Array.from(allLabels).sort();
+
+    const rows = sorted.map(lbl => {
+      const lblSessions = Object.entries(shotData).filter(([,d]) => d.label === lbl);
+      const nSessions = lblSessions.length;
+      const shots    = lblSessions.flatMap(([,d]) => (d.shots||[]).filter(s => !String(s.display_text||'').startsWith('S')));
+      const sighters = lblSessions.flatMap(([,d]) => (d.shots||[]).filter(s =>  String(s.display_text||'').startsWith('S')));
+      const shooters = new Set(lblSessions.map(([,d]) => d.name).filter(Boolean));
+      const dists    = new Set(lblSessions.map(([,d]) => d.dist ? `${d.dist}${d.dist_unit||''}` : null).filter(Boolean));
+      const tsList   = lblSessions.flatMap(([,d]) => (d.shots||[]).map(s => s.ts||0)).filter(t => t > 0);
+      const dateFirst = tsList.length ? new Date(Math.min(...tsList)).toLocaleDateString('en-AU',{day:'2-digit',month:'short',year:'2-digit'}) : '—';
+      const dateLast  = tsList.length ? new Date(Math.max(...tsList)).toLocaleDateString('en-AU',{day:'2-digit',month:'short',year:'2-digit'}) : '—';
+      const isSelected = lbl === diagTarget;
+      return `<tr style="border-top:1px solid var(--border);${isSelected?'background:rgba(91,141,238,0.08)':''}">
+        <td style="padding:5px 8px;font-weight:700;color:${isSelected?'var(--accent2)':'var(--text)'}">${lbl}</td>
+        <td style="text-align:center;padding:5px 4px">${nSessions}</td>
+        <td style="text-align:center;padding:5px 4px;color:var(--accent2)">${shots.length}</td>
+        <td style="text-align:center;padding:5px 4px;color:var(--muted)">${sighters.length}</td>
+        <td style="text-align:center;padding:5px 4px">${shooters.size}</td>
+        <td style="text-align:center;padding:5px 4px;font-size:10px;color:var(--muted)">${Array.from(dists).sort().join(', ')||'—'}</td>
+        <td style="text-align:center;padding:5px 4px;font-size:10px;color:var(--muted);white-space:nowrap">${dateFirst}</td>
+        <td style="text-align:center;padding:5px 4px;font-size:10px;color:var(--muted);white-space:nowrap">${dateLast}</td>
+      </tr>`;
+    }).join('');
+
+    return `<div style="width:100%;max-width:660px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;box-sizing:border-box;overflow-x:auto">
+      <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Backup Data Summary</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:420px">
+        <tr style="color:var(--muted);font-size:10px">
+          <th style="text-align:left;padding:3px 8px">Target</th>
+          <th style="text-align:center;padding:3px 4px">Sessions</th>
+          <th style="text-align:center;padding:3px 4px">Shots</th>
+          <th style="text-align:center;padding:3px 4px">Sighters</th>
+          <th style="text-align:center;padding:3px 4px">Shooters</th>
+          <th style="text-align:center;padding:3px 4px">Distances</th>
+          <th style="text-align:center;padding:3px 4px">First</th>
+          <th style="text-align:center;padding:3px 4px">Last</th>
+        </tr>
+        ${rows}
+      </table>
+    </div>`;
+  })();
+
   // ── Tab buttons ──
   const tabsHTML = labels.map(l =>
     `<button onclick="diagTarget='${l}';renderDiagnostics()" style="
@@ -1908,6 +1956,7 @@ function renderDiagnostics() {
   }
 
   page.innerHTML = `
+    ${summaryTableHTML}
     ${card('🎯','Select Target Unit',
       'Choose which Shotmarker target unit to analyse. Each unit has its own sensor characteristics and history.',
       `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">${tabsHTML}</div>${statsHTML}`)}
