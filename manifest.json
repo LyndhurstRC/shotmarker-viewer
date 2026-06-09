@@ -2,7 +2,7 @@
   "name": "Shotmarker Viewer",
   "short_name": "Shotmarker",
   "description": "Lyndhurst Rifle Club — Shotmarker offline backup viewer",
-  "start_url": "index.html",
+  "start_url": "lrc-viewer.html",
   "display": "standalone",
   "background_color": "#1c1c1e",
   "theme_color": "#1c1c1e",
