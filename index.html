@@ -58,12 +58,12 @@
   #load-progress { color: var(--accent); font-size: 14px; min-height: 20px; }
 
   .drive-btn {
-    display: inline-flex; align-items: center; gap: 8px;
+    display: inline-flex; align-items: center; gap: 10px;
     background: #1a73e8; color: #fff;
     border: none; border-radius: 10px;
-    padding: 12px 22px; font-size: 15px; font-weight: 600;
-    cursor: pointer; text-decoration: none;
-    transition: background 0.15s;
+    padding: 14px 24px; font-size: 15px; font-weight: 500;
+    cursor: pointer; text-decoration: none; text-align: left;
+    transition: background 0.15s; line-height: 1.4;
   }
   .drive-btn:hover { background: #1558b0; }
   .drive-btn svg { flex-shrink: 0; }
@@ -264,7 +264,14 @@
   #shot-table tr.hl td { background: rgba(232,160,32,0.12); }
   #shot-table tr:hover td { background: rgba(255,255,255,0.04); }
 
-  #empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; color: var(--muted); gap: 10px; }
+
+  .back-btn {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 7px; color: var(--muted); padding: 5px 11px;
+    font-size: 13px; cursor: pointer; white-space: nowrap;
+  }
+  .back-btn:hover { color: var(--text); border-color: var(--muted); }
+
   #empty-state .big { font-size: 44px; }
 
   #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 9px 18px; font-size: 13px; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 999; white-space: nowrap; }
@@ -347,6 +354,7 @@
   </div>
   <div style="margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:4px">
     <div style="display:flex;gap:6px;align-items:center">
+      <button id="back-btn" onclick="returnToStart()" class="back-btn" style="display:none">← New File</button>
       <label>
         <span id="btn-reload" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:6px 12px;font-size:13px;cursor:pointer;white-space:nowrap">⬇ Downloads</span>
         <input type="file" id="file-input-hdr" accept=".tar" style="display:none">
@@ -370,20 +378,8 @@
 
 <div id="load-screen">
 
-  <div class="how-to">
-    <h3>How to view a session</h3>
-    <ol>
-      <li>Tap <strong>Step 1</strong> below to open the LyndhurstRC Drive folder</li>
-      <li>Find the backup file you want to view <span>(.tar)</span> and <strong>download it</strong>
-        <br><span>On Android: press and hold the file → tap Download · On iPhone/iPad: tap the file → tap the share icon → Save to Files</span>
-      </li>
-      <li>Tap <strong>Select LRC File</strong> below to load it from your Downloads folder</li>
-      <li>Alternatively, export a backup directly from the <strong>Shotmarker app</strong> — any <span>.tar</span> backup file will work. Tap <strong>or Select Any File</strong> to browse to wherever it is saved</li>
-    </ol>
-  </div>
-
   <!-- Step 1: Get the backup file from Drive -->
-  <a id="drive-link" href="https://drive.google.com/drive/folders/16ziDZMijxlZAigotp-WxkjOVgWUoZRvt?usp=sharing" target="_blank" class="drive-btn" style="width:100%;max-width:320px;box-sizing:border-box;justify-content:center;">
+  <a id="drive-link" href="https://drive.google.com/drive/folders/16ziDZMijxlZAigotp-WxkjOVgWUoZRvt?usp=sharing" target="_blank" class="drive-btn" style="width:100%;max-width:360px;box-sizing:border-box;justify-content:center;">
     <svg width="20" height="20" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
       <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
       <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/>
@@ -392,7 +388,7 @@
       <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
       <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 27h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
     </svg>
-    Step 1 — Open LyndhurstRC Drive Folder
+    Open LyndhurstRC Cloud Drive &<br>Download Data File
   </a>
 
   <!-- Step 2: Load the file -->
@@ -409,21 +405,13 @@
       </svg>
     </div>
     <h2>Load Backup File</h2>
-    <p>Select your downloaded <strong>SM_backup_*.tar</strong> file</p>
-    <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;justify-content:center;">
-      <label for="file-input" style="display:inline-flex;align-items:center;gap:8px;background:var(--accent);color:#000;font-weight:600;padding:12px 22px;border-radius:10px;font-size:15px;cursor:pointer;box-sizing:border-box;justify-content:center;flex:1;min-width:160px;max-width:220px;">
+    <div style="margin-top:16px;display:flex;justify-content:center;">
+      <label for="file-input" style="display:inline-flex;align-items:center;gap:10px;background:var(--accent);color:#000;font-weight:600;padding:14px 28px;border-radius:10px;font-size:15px;cursor:pointer;box-sizing:border-box;justify-content:center;">
         <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path d="M3 7a2 2 0 0 1 2-2h4l2 2h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" fill="#1a73e8"/>
           <path d="M3 10h18v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7z" fill="#4da3ff"/>
         </svg>
-        Select LRC File
-      </label>
-      <label for="file-input-any" style="display:inline-flex;align-items:center;gap:8px;background:#2a7a3b;color:#fff;font-weight:600;padding:12px 22px;border-radius:10px;font-size:15px;cursor:pointer;box-sizing:border-box;justify-content:center;flex:1;min-width:160px;max-width:220px;">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="3" y="3" width="18" height="18" rx="3" stroke="rgba(255,255,255,0.6)" stroke-width="1.8"/>
-          <path d="M8 12h8M12 8v8" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
-        </svg>
-        Select Any File
+        Select Downloaded File
       </label>
     </div>
     <input type="file" id="file-input" accept=".tar" style="position:absolute;left:-9999px;opacity:0;">
@@ -444,7 +432,7 @@
 
   <div id="content">
     <div id="empty-state">
-      <div class="big">
+      <div class="big" style="display:flex;justify-content:center">
         <svg width="90" height="72" viewBox="0 0 90 72" xmlns="http://www.w3.org/2000/svg">
           <rect x="0" y="0" width="90" height="72" rx="6" fill="#1a1a1a" stroke="#555" stroke-width="1.5"/>
           <circle cx="45" cy="36" r="30" fill="white"/>
@@ -455,12 +443,11 @@
           <circle cx="45" cy="36" r="3"  fill="#1a1a1a"/>
         </svg>
       </div>
-      <div>Select a session above to view shots</div>
+      <div style="text-align:center">Select a session above to view shots</div>
     </div>
 
     <div id="session-info" style="display:none"></div>
 
-    <!-- Score strip - matches Shotmarker app layout -->
     <div id="score-strip" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 14px;width:100%;max-width:660px;">
       <div style="display:flex;gap:12px;align-items:baseline;margin-bottom:8px;flex-wrap:wrap">
         <div id="ss-shots" style="font-size:13px;color:var(--muted)"></div>
@@ -474,8 +461,6 @@
         <div id="ss-grid" style="display:flex;flex-wrap:nowrap;gap:4px;flex:1;min-width:0"></div>
       </div>
     </div>
-
-    <!-- Save stage button is below shot-detail -->
 
     <div id="target-wrap" style="display:none">
       <canvas id="target-canvas"></canvas>
@@ -493,6 +478,9 @@
         <div class="theme-btn" onclick="setTheme('green',this)" title="Night Vision" style="color:#00bb55">⬤</div>
         <div class="theme-btn" onclick="setTheme('steel',this)" title="Blue Steel" style="color:#4488bb">⬤</div>
       </div>
+      <div style="position:absolute;bottom:8px;left:8px">
+        <button onclick="saveStageImage()" style="background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#fff;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px">💾 Save Stage</button>
+      </div>
     </div>
 
     <div id="shot-detail">
@@ -503,12 +491,8 @@
       <div class="sd-dismiss" onclick="clearHighlight()">✕</div>
     </div>
 
-    <div id="save-stage-wrap" style="display:none;width:100%;max-width:660px;justify-content:flex-end">
-      <button onclick="saveStageImage()" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px">💾 Save Stage Image</button>
-    </div>
-
     <div id="shot-table-wrap" style="display:none">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:8px">
         <h3 style="margin:0">Shot log — tap row to highlight on target</h3>
         <label id="garmin-btn" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:5px 11px;font-size:12px;cursor:pointer;white-space:nowrap">📥 Import Garmin CSV
           <input type="file" id="garmin-input" accept=".csv" style="display:none">
@@ -601,6 +585,7 @@ async function loadTar(file) {
   document.getElementById('btn-reload').style.display = 'inline-block';
   document.getElementById('drive-link-hdr').style.display = '';
   document.getElementById('main-nav').style.display = 'flex';
+  document.getElementById('back-btn').style.display = '';
   const fnEl = document.getElementById('open-filename');
   fnEl.textContent = '📂 ' + file.name;
   fnEl.style.display = 'block';
@@ -627,6 +612,28 @@ function parseTar(buf) {
   }
   return files;
 }
+
+function returnToStart() {
+  // Reset all state
+  sessions = []; shotData = {}; currentMeta = null; currentShots = []; currentSighters = [];
+  currentId = null; selectedShot = null; allDistances = new Set(); activeDistFilter = null;
+  garminData = {}; excludedShots = {}; garminLibrary = [];
+  zoom = 1; panX = 0; panY = 0;
+
+  document.getElementById('load-screen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('diag-page').style.display = 'none';
+  document.getElementById('main-nav').style.display = 'none';
+  document.getElementById('back-btn').style.display = 'none';
+  document.getElementById('btn-reload').style.display = 'none';
+  document.getElementById('drive-link-hdr').style.display = 'none';
+  document.getElementById('open-filename').style.display = 'none';
+  document.getElementById('file-input').value = '';
+  document.getElementById('file-input-any').value = '';
+  currentTab = 'sessions';
+}
+
+
 
 function prog(msg) { document.getElementById('load-progress').textContent = msg; }
 
@@ -710,7 +717,6 @@ function openSession(id) {
   document.getElementById('session-info').style.display = '';
   document.getElementById('score-strip').style.display = '';
   document.getElementById('target-wrap').style.display = '';
-  document.getElementById('save-stage-wrap').style.display = 'flex';
   document.getElementById('shot-table-wrap').style.display = '';
   document.getElementById('shot-detail').style.display = 'none';
 
@@ -1232,14 +1238,14 @@ function saveStageImage() {
 
   // ── Measure height needed ──
   const TARGET_SIZE   = W - PAD*2;
-  const HEADER_H      = 140;
-  const STATS_H       = 70;
-  const GARMIN_H      = hasGarmin ? 80 : 0;
+  const HEADER_H      = 100;
+  const INFO_ROW_H    = shots.length > 0 ? 60 : 0;
+  const GARMIN_ROW_H  = hasGarmin ? 70 : 0;
   const STRIP_H       = 56;
   const TABLE_ROW_H   = 22;
   const TABLE_ROWS    = currentSighters.length + currentShots.length;
   const TABLE_H       = TABLE_ROWS * TABLE_ROW_H + 28;
-  const TOTAL_H       = HEADER_H + STATS_H + GARMIN_H + STRIP_H + TARGET_SIZE + TABLE_H + PAD*4;
+  const TOTAL_H       = HEADER_H + INFO_ROW_H + GARMIN_ROW_H + STRIP_H + 8 + TARGET_SIZE + 12 + TABLE_H + PAD*3;
 
   const out = document.createElement('canvas');
   out.width  = W * dpr;
@@ -1281,31 +1287,6 @@ function saveStageImage() {
   ctx.fillText(`${meta.target_name}  ·  ${meta.dist}  ·  ${meta.dateStr} ${meta.time}`, PAD, y);
   y += 20;
 
-  // Velocity stats
-  const vels = shots.map((s,i)=>{ const g=getGarminFps(i); return g||( s.v>0?s.v*FPS_CONV:null); }).filter(Boolean);
-  if (vels.length>1) {
-    const avg=vels.reduce((a,b)=>a+b,0)/vels.length;
-    const sd=Math.sqrt(vels.map(v=>(v-avg)**2).reduce((a,b)=>a+b,0)/vels.length);
-    const es=Math.max(...vels)-Math.min(...vels);
-    const src = hasGarmin ? ' (Garmin)' : ' (acoustic)';
-    ctx.fillStyle = BLUE;
-    ctx.font = '13px -apple-system,sans-serif';
-    ctx.fillText(`avg ${Math.round(avg)} fps  SD ${sd.toFixed(1)}  ES ${Math.round(es)}${src}`, PAD, y);
-    y += 18;
-  }
-
-  // MOA
-  if (shots.length>=2 && data?.dist) {
-    const distMm = distToMm(data.dist, data.dist_unit||'m');
-    const moa = calcGroupMOA(shots, distMm);
-    if (moa) {
-      ctx.fillStyle = '#c080e0';
-      ctx.font = '13px -apple-system,sans-serif';
-      ctx.fillText(`Group ${moa.toFixed(2)} MOA`, PAD, y);
-      y += 18;
-    }
-  }
-
   // Watermark
   ctx.fillStyle = 'rgba(232,160,32,0.4)';
   ctx.font = '11px -apple-system,sans-serif';
@@ -1313,6 +1294,85 @@ function saveStageImage() {
   ctx.fillText('Lyndhurst Rifle Club 2026 — JG', W-PAD, PAD+4);
 
   y = HEADER_H;
+
+  // ── Session info stats row ──
+  const smVels = shots.filter(s=>s.v>0).map(s=>s.v*FPS_CONV);
+  const statItems = [];
+  statItems.push({ val: String(shots.length), lbl: 'SHOTS', col: COL });
+  if (smVels.length>1) {
+    const avg=smVels.reduce((a,b)=>a+b,0)/smVels.length;
+    const sd=Math.sqrt(smVels.map(v=>(v-avg)**2).reduce((a,b)=>a+b,0)/smVels.length);
+    const es=Math.max(...smVels)-Math.min(...smVels);
+    statItems.push({ val: Math.round(avg).toString(), lbl: 'AVG FPS', col: BLUE });
+    statItems.push({ val: sd.toFixed(1), lbl: 'STD DEV', col: AMBER });
+    statItems.push({ val: Math.round(es).toString(), lbl: 'SPREAD', col: COL });
+    statItems.push({ val: Math.round(Math.max(...smVels)).toString(), lbl: 'MAX FPS', col: COL });
+    statItems.push({ val: Math.round(Math.min(...smVels)).toString(), lbl: 'MIN FPS', col: COL });
+  }
+  if (shots.length>=2 && data?.dist) {
+    const distMm=distToMm(data.dist, data.dist_unit||'m');
+    const moa=calcGroupMOA(shots, distMm);
+    if (moa) statItems.push({ val: moa.toFixed(2), lbl: 'GROUP MOA', col: '#c080e0' });
+  }
+  if (statItems.length) {
+    const INFO_H = 56;
+    ctx.fillStyle = SURF;
+    ctx.fillRect(PAD, y, W-PAD*2, INFO_H);
+    const statW = (W-PAD*2) / statItems.length;
+    statItems.forEach((st, i) => {
+      const sx2 = PAD + i*statW + statW/2;
+      ctx.fillStyle = st.col;
+      ctx.font = 'bold 18px -apple-system,sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(st.val, sx2, y+18);
+      ctx.fillStyle = MUTED;
+      ctx.font = '9px -apple-system,sans-serif';
+      ctx.fillText(st.lbl, sx2, y+42);
+    });
+    y += INFO_H + 4;
+  }
+
+  // ── Garmin panel ──
+  if (hasGarmin) {
+    const gArr = garminData[currentId];
+    const gVels = gArr.filter(Boolean).map(g=>g.fps);
+    if (gVels.length>1) {
+      const ga=gVels.reduce((a,b)=>a+b,0)/gVels.length;
+      const gsd=Math.sqrt(gVels.map(v=>(v-ga)**2).reduce((a,b)=>a+b,0)/gVels.length);
+      const ges=Math.max(...gVels)-Math.min(...gVels);
+      const grains = gArr._bulletWeight || 155.5;
+      const ke = 0.5*grains*ga*ga/450380;
+      const gStats = [
+        { val: String(gVels.length), lbl: 'SHOTS', col: COL },
+        { val: Math.round(ga).toString(), lbl: 'AVG FPS', col: BLUE },
+        { val: gsd.toFixed(1), lbl: 'STD DEV', col: AMBER },
+        { val: Math.round(ges).toString(), lbl: 'SPREAD', col: COL },
+        { val: Math.round(Math.max(...gVels)).toString(), lbl: 'MAX FPS', col: COL },
+        { val: Math.round(Math.min(...gVels)).toString(), lbl: 'MIN FPS', col: COL },
+        { val: ke.toFixed(0), lbl: 'KE FT·LB', col: COL },
+      ];
+      const GARM_H = 66;
+      ctx.fillStyle = SURF2;
+      ctx.fillRect(PAD, y, W-PAD*2, GARM_H);
+      // Label
+      ctx.fillStyle = MUTED;
+      ctx.font = 'bold 9px -apple-system,sans-serif';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+      ctx.fillText('📡 GARMIN XERO', PAD+8, y+5);
+      const gStatW = (W-PAD*2) / gStats.length;
+      gStats.forEach((st, i) => {
+        const sx2 = PAD + i*gStatW + gStatW/2;
+        ctx.fillStyle = st.col;
+        ctx.font = 'bold 16px -apple-system,sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(st.val, sx2, y+30);
+        ctx.fillStyle = MUTED;
+        ctx.font = '9px -apple-system,sans-serif';
+        ctx.fillText(st.lbl, sx2, y+52);
+      });
+      y += GARM_H + 4;
+    }
+  }
 
   // ── Score strip ──
   ctx.fillStyle = SURF;
