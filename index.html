@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -268,6 +269,59 @@
 
   #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 9px 18px; font-size: 13px; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 999; white-space: nowrap; }
   #toast.show { opacity: 1; }
+
+  /* Nav tabs */
+  .nav-tab {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 7px;
+    color: var(--muted); padding: 5px 12px; font-size: 13px; font-weight: 600;
+    cursor: pointer; white-space: nowrap;
+  }
+  .nav-tab.active { background: rgba(91,141,238,0.2); border-color: var(--accent2); color: var(--accent2); }
+
+  /* Diagnostics page */
+  #diag-page {
+    display: none; flex-direction: column; min-height: calc(100vh - 56px);
+    padding: 16px; gap: 16px; align-items: center;
+  }
+  .diag-card {
+    width: 100%; max-width: 660px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px 18px;
+  }
+  .diag-card-title {
+    font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 4px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .diag-card-title .diag-icon { font-size: 18px; }
+  .diag-explain {
+    font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 12px;
+    padding: 8px 10px; background: var(--surface2); border-radius: 6px;
+    border-left: 3px solid var(--accent2);
+  }
+  .diag-target-tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+  .diag-target-tab {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 14px;
+    padding: 5px 14px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--muted);
+    white-space: nowrap;
+  }
+  .diag-target-tab.active { background: rgba(91,141,238,0.2); border-color: var(--accent2); color: var(--accent2); }
+
+  /* Bar charts */
+  .diag-bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .diag-bar-label { font-size: 11px; color: var(--muted); width: 80px; flex-shrink: 0; text-align: right; }
+  .diag-bar-track { flex: 1; background: var(--surface2); border-radius: 3px; height: 18px; position: relative; overflow: hidden; }
+  .diag-bar-fill { height: 100%; border-radius: 3px; transition: width 0.4s; }
+  .diag-bar-val { font-size: 11px; color: var(--text); width: 40px; flex-shrink: 0; font-weight: 600; }
+
+  /* Scatter / timeline */
+  .diag-chart-wrap { width: 100%; overflow-x: auto; }
+
+  /* Summary stat row */
+  .diag-stats { display: flex; gap: 0; flex-wrap: wrap; margin-top: 10px; }
+  .diag-stat { flex: 1; min-width: 80px; text-align: center; padding: 6px 4px; }
+  .diag-stat .dv { font-size: 20px; font-weight: 700; line-height: 1; }
+  .diag-stat .dl { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-top: 2px; }
+
 </style>
 </head>
 <body>
@@ -285,6 +339,11 @@
   <div>
     <div class="title">Shotmarker Viewer</div>
     <div class="sub">Offline Plot Data</div>
+  </div>
+  <!-- Nav tabs -->
+  <div id="main-nav" style="display:none;margin-left:16px;gap:4px;flex-direction:row">
+    <button class="nav-tab active" id="tab-sessions" onclick="switchTab('sessions')">Sessions</button>
+    <button class="nav-tab" id="tab-diagnostics" onclick="switchTab('diagnostics')">Hardware</button>
   </div>
   <div style="margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:4px">
     <div style="display:flex;gap:6px;align-items:center">
@@ -432,7 +491,7 @@
         <div class="theme-btn" onclick="setTheme('green',this)" title="Night Vision" style="color:#00bb55">⬤</div>
         <div class="theme-btn" onclick="setTheme('steel',this)" title="Blue Steel" style="color:#4488bb">⬤</div>
       </div>
-      <div id="zoom-label">Pinch to zoom · drag to pan · tap shot</div>
+
     </div>
 
     <div id="shot-detail">
@@ -454,12 +513,15 @@
         </div>
       </div>
       <table id="shot-table">
-        <thead><tr><th>#</th><th>Score</th><th>Interval</th><th>fps</th><th>X mm</th><th>Y mm</th><th></th></tr></thead>
+        <thead><tr><th>#</th><th>Score</th><th>Interval</th><th>fps</th><th>X mm</th><th>Y mm</th><th>θ°</th><th></th></tr></thead>
         <tbody id="shot-tbody"></tbody>
       </table>
+
     </div>
   </div>
 </div>
+
+<div id="diag-page"></div>
 
 <div id="toast"></div>
 
@@ -531,6 +593,7 @@ async function loadTar(file) {
   document.getElementById('app').style.display = 'flex';
   document.getElementById('btn-reload').style.display = 'inline-block';
   document.getElementById('drive-link-hdr').style.display = '';
+  document.getElementById('main-nav').style.display = 'flex';
   const fnEl = document.getElementById('open-filename');
   fnEl.textContent = '📂 ' + file.name;
   fnEl.style.display = 'block';
@@ -1580,7 +1643,6 @@ function formatInterval(ms) {
 
 function renderTable() {
   const shots=currentShots, sighters=currentSighters;
-  // Build combined ordered list for interval calculation: sighters first, then shots
   const allOrdered = [...sighters, ...shots];
   let html = '';
 
@@ -1605,6 +1667,7 @@ function renderTable() {
         <td>${s.x!=null?s.x.toFixed(1):'-'}</td>
         <td>${s.y!=null?s.y.toFixed(1):'-'}</td>
         <td></td>
+        <td></td>
       </tr>`;
     }).join('');
   }
@@ -1624,6 +1687,8 @@ function renderTable() {
     const excl = isExcluded(i);
     const exclIcon = excl ? '↩' : '✕';
     const exclTitle = excl ? 'Re-include shot' : 'Exclude shot';
+    const thetaDeg = s.theta != null ? (s.theta * 180 / Math.PI).toFixed(2) : '-';
+    const thetaCol = s.theta != null ? (Math.abs(s.theta * 180 / Math.PI) > 3 ? '#e03030' : Math.abs(s.theta * 180 / Math.PI) > 1.5 ? '#e8a020' : 'var(--muted)') : 'var(--muted)';
     return `<tr class="${excl?'excluded':''}" onclick="highlightShot(${i})">
       <td style="color:var(--muted);font-weight:600">${lbl}</td>
       <td><span class="sc-pill">${sc}</span></td>
@@ -1631,12 +1696,238 @@ function renderTable() {
       <td>${fpsCell}</td>
       <td>${s.x!=null?s.x.toFixed(1):'-'}</td>
       <td>${s.y!=null?s.y.toFixed(1):'-'}</td>
+      <td style="font-size:11px;color:${thetaCol}">${thetaDeg}</td>
       <td><button class="excl-btn" title="${exclTitle}" onclick="event.stopPropagation();toggleExclude(${i})">${exclIcon}</button></td>
     </tr>`;
   }).join('');
 
   document.getElementById('shot-tbody').innerHTML = html;
 }
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+let currentTab = 'sessions';
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.getElementById('tab-sessions').classList.toggle('active', tab === 'sessions');
+  document.getElementById('tab-diagnostics').classList.toggle('active', tab === 'diagnostics');
+  document.getElementById('app').style.display = tab === 'sessions' ? 'flex' : 'none';
+  document.getElementById('diag-page').style.display = tab === 'diagnostics' ? 'flex' : 'none';
+  if (tab === 'diagnostics') setTimeout(renderDiagnostics, 50);
+}
+
+let diagTarget = null;
+
+function renderDiagnostics() {
+  const page = document.getElementById('diag-page');
+
+  if (!Object.keys(shotData).length) {
+    page.innerHTML = '<div style="color:var(--muted);text-align:center;padding:60px 20px;font-size:14px">Load a backup file first.</div>';
+    return;
+  }
+
+  // Get all target labels from parsed session data
+  const labelSet = new Set();
+  Object.values(shotData).forEach(d => { if (d.label) labelSet.add(d.label); });
+  const labels = Array.from(labelSet).sort();
+  if (!diagTarget || !labels.includes(diagTarget)) diagTarget = labels[0];
+
+  // Get sessions and shots for selected target
+  const sessions = Object.entries(shotData)
+    .filter(([,d]) => d.label === diagTarget)
+    .map(([id,d]) => ({ id, data:d, ts:parseInt(id) }))
+    .sort((a,b) => a.ts - b.ts);
+
+  const allShots = sessions.flatMap(s => s.data.shots || []);
+  const shots = allShots.filter(s => s.t && s.t.length === 8);
+
+  const CRIT = [4,7];
+  const SNAMES = ['FL-BL','FL-TL','FL-TR','FL-BR','BK-BL','BK-TL','BK-TR','BK-BR'];
+  const SLONG  = ['Front Bottom-Left','Front Top-Left','Front Top-Right','Front Bottom-Right',
+                  'Back Bottom-Left','Back Top-Left','Back Top-Right','Back Bottom-Right'];
+
+  const dropoutShots  = shots.filter(s => s.t.some(v=>v===-1)).length;
+  const criticalShots = shots.filter(s => CRIT.some(i=>s.t[i]===-1)).length;
+
+  // ── Tab buttons ──
+  const tabsHTML = labels.map(l =>
+    `<button onclick="diagTarget='${l}';renderDiagnostics()" style="
+      background:${l===diagTarget?'rgba(91,141,238,0.2)':'var(--surface2)'};
+      border:1px solid ${l===diagTarget?'var(--accent2)':'var(--border)'};
+      color:${l===diagTarget?'var(--accent2)':'var(--muted)'};
+      border-radius:14px;padding:5px 16px;font-size:13px;font-weight:600;cursor:pointer">${l}</button>`
+  ).join('');
+
+  // ── Summary stats ──
+  const statsHTML = `
+    <div style="display:flex;gap:0;flex-wrap:wrap;margin-top:10px">
+      <div style="flex:1;min-width:80px;text-align:center;padding:6px 4px">
+        <div style="font-size:22px;font-weight:700;color:var(--accent2)">${sessions.length}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Sessions</div>
+      </div>
+      <div style="flex:1;min-width:80px;text-align:center;padding:6px 4px">
+        <div style="font-size:22px;font-weight:700">${shots.length}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Total Shots</div>
+      </div>
+      <div style="flex:1;min-width:80px;text-align:center;padding:6px 4px">
+        <div style="font-size:22px;font-weight:700;color:#e8a020">${dropoutShots}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Dropout Shots</div>
+      </div>
+      <div style="flex:1;min-width:80px;text-align:center;padding:6px 4px">
+        <div style="font-size:22px;font-weight:700;color:#e03030">${criticalShots}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Critical Dropouts</div>
+      </div>
+    </div>`;
+
+  // ── Sensor dropout bars ──
+  const maxRate = Math.max(...[0,1,2,3,4,5,6,7].map(i => shots.filter(s=>s.t[i]===-1).length / Math.max(shots.length,1))) || 0.01;
+  let sensorBarsHTML = '';
+  for (let i = 0; i < 8; i++) {
+    const d = shots.filter(s => s.t[i] === -1).length;
+    const rate = shots.length ? d / shots.length : 0;
+    const pct = (rate*100).toFixed(1);
+    const col = i < 4 ? (d > 0 ? '#e03030' : '#4caf50')
+              : CRIT.includes(i) ? (rate > 0.15 ? '#e03030' : rate > 0.05 ? '#e8a020' : '#4caf50')
+              : (rate > 0.15 ? '#e8a020' : '#4caf50');
+    const barW = (rate / maxRate * 100).toFixed(1);
+    sensorBarsHTML += `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <div style="font-size:11px;color:var(--muted);width:70px;flex-shrink:0;text-align:right">S${i} ${i<4?'Front':'Back'}</div>
+        <div style="flex:1;background:var(--surface2);border-radius:4px;height:22px;overflow:hidden;position:relative">
+          <div style="height:100%;width:${barW}%;background:${col};border-radius:4px;min-width:${d>0?3:0}px"></div>
+          <div style="position:absolute;left:6px;top:50%;transform:translateY(-50%);font-size:10px;color:rgba(255,255,255,0.6);pointer-events:none">${SLONG[i]}${CRIT.includes(i)?' ⚠':''}</div>
+        </div>
+        <div style="font-size:12px;font-weight:700;color:${col};width:50px;flex-shrink:0">${pct}% <span style="font-size:9px;color:var(--muted)">${d}</span></div>
+      </div>`;
+  }
+
+  // ── Critical vs non-critical ──
+  const all8    = shots.filter(s => s.t.every(v=>v!==-1)).length;
+  const nonCrit = shots.filter(s => !s.t.every(v=>v!==-1) && !CRIT.some(i=>s.t[i]===-1)).length;
+  const critical = shots.filter(s => CRIT.some(i=>s.t[i]===-1)).length;
+  const total = Math.max(shots.length, 1);
+  const critBarsHTML = [
+    { label:'All 8 sensors active',  val:all8,    col:'#4caf50', desc:'Ideal — full solution' },
+    { label:'Non-critical dropout',   val:nonCrit, col:'#e8a020', desc:'S5 or S6 missing — minor impact' },
+    { label:'Critical dropout',       val:critical, col:'#e03030', desc:'S4 or S7 missing — X position may shift up to 15mm' },
+  ].map(b => `
+    <div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+        <span style="font-size:12px;color:${b.col};font-weight:600">${b.label}</span>
+        <span style="font-size:12px;font-weight:700;color:${b.col}">${b.val} (${(b.val/total*100).toFixed(0)}%)</span>
+      </div>
+      <div style="background:var(--surface2);border-radius:4px;height:16px;overflow:hidden">
+        <div style="height:100%;width:${(b.val/total*100).toFixed(1)}%;background:${b.col};border-radius:4px"></div>
+      </div>
+      <div style="font-size:10px;color:var(--muted);margin-top:2px">${b.desc}</div>
+    </div>`).join('');
+
+  // ── Dropout pattern per session (which sensors, not just rate) ──
+  const SSHORT = ['FL-BL','FL-TL','FL-TR','FL-BR','BK-BL','BK-TL','BK-TR','BK-BR'];
+  // ── Calibration summary ──
+  const calHTML = (() => {
+    if (!sessions.length) return '<div style="color:var(--muted);font-size:12px">No data</div>';
+    const calVals = sessions.map(({data,ts}) => ({ cx: data.cal_x||0, cy: data.cal_y||0, ts }));
+    const current = calVals[calVals.length - 1];
+    const changes = calVals.filter((v,i) => i > 0 && (v.cx !== calVals[i-1].cx || v.cy !== calVals[i-1].cy));
+    const changeNote = changes.length === 0
+      ? `<span style="color:#4caf50">✓ No changes</span> — calibration has been <strong>${current.cx}mm L/R, ${current.cy}mm U/D</strong> across all ${sessions.length} sessions.`
+      : `<span style="color:#e8a020">⚠ ${changes.length} change${changes.length>1?'s':''} detected</span> — current calibration is <strong>${current.cx}mm L/R, ${current.cy}mm U/D</strong>. The offset was manually updated ${changes.length} time${changes.length>1?'s':''} across ${sessions.length} sessions.`;
+    return `
+      <div style="display:flex;gap:0;flex-wrap:wrap;margin-bottom:10px">
+        <div style="flex:1;min-width:100px;text-align:center;padding:6px 4px">
+          <div style="font-size:26px;font-weight:700;color:var(--accent2)">${current.cx}mm</div>
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">cal_x — Left / Right</div>
+        </div>
+        <div style="flex:1;min-width:100px;text-align:center;padding:6px 4px">
+          <div style="font-size:26px;font-weight:700;color:#e03030">${current.cy}mm</div>
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">cal_y — Up / Down</div>
+        </div>
+      </div>
+      <div style="padding:8px 10px;background:var(--surface2);border-radius:6px;font-size:12px;color:var(--muted);line-height:1.5">${changeNote}</div>`;
+  })();
+
+  // ── err_xy histogram ──
+  const errVals = shots.map(s => s.err_xy || 0);
+  const errBuckets = [{min:0,max:0.05,label:'0.00–0.05'},{min:0.05,max:0.10,label:'0.05–0.10'},
+    {min:0.10,max:0.15,label:'0.10–0.15'},{min:0.15,max:0.20,label:'0.15–0.20'},
+    {min:0.20,max:0.25,label:'0.20–0.25'},{min:0.25,max:999,label:'≥0.25'}];
+  const errCounts = errBuckets.map(b => errVals.filter(v=>v>=b.min&&v<b.max).length);
+  const maxErr = Math.max(...errCounts, 1);
+  const errHTML = errBuckets.map((b,i) => {
+    const col = b.min>=0.20?'#e03030':b.min>=0.10?'#e8a020':'#4caf50';
+    const pct = errVals.length ? (errCounts[i]/errVals.length*100).toFixed(0) : 0;
+    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <div style="font-size:11px;color:var(--muted);width:74px;flex-shrink:0;text-align:right">${b.label}</div>
+      <div style="flex:1;background:var(--surface2);border-radius:4px;height:16px;overflow:hidden">
+        <div style="height:100%;width:${(errCounts[i]/maxErr*100).toFixed(1)}%;background:${col};border-radius:4px"></div>
+      </div>
+      <div style="font-size:11px;font-weight:600;color:${col};width:70px;flex-shrink:0">${errCounts[i]} (${pct}%)</div>
+    </div>`;
+  }).join('');
+
+  // ── Velocity comparison ──
+  const gSessions = sessions.filter(({id}) => garminData[id]?.some(Boolean));
+  const velHTML = gSessions.length ? `
+    <table style="width:100%;font-size:12px;border-collapse:collapse">
+      <tr style="color:var(--muted);font-size:10px">
+        <th style="text-align:left;padding:4px 0">Session</th>
+        <th style="text-align:center">Dist</th>
+        <th style="text-align:center">Garmin<br>avg / SD</th>
+        <th style="text-align:center">SM acoustic<br>avg / SD</th>
+        <th style="text-align:center">Difference</th>
+      </tr>
+      ${gSessions.map(({id,data,ts}) => {
+        const gv = garminData[id].filter(Boolean).map(g=>g.fps);
+        const ga = gv.reduce((a,b)=>a+b,0)/gv.length;
+        const gsd = Math.sqrt(gv.map(v=>(v-ga)**2).reduce((a,b)=>a+b,0)/gv.length);
+        const sv = (data.shots||[]).filter(s=>s.v>0&&!String(s.display_text||'').startsWith('S')).map(s=>s.v*FPS_CONV);
+        const sa = sv.length ? sv.reduce((a,b)=>a+b,0)/sv.length : null;
+        const ssd = sa ? Math.sqrt(sv.map(v=>(v-sa)**2).reduce((a,b)=>a+b,0)/sv.length) : null;
+        const diff = sa ? sa-ga : null;
+        const dc = diff===null?'var(--muted)':Math.abs(diff)<5?'#4caf50':Math.abs(diff)<15?'#e8a020':'#e03030';
+        const ds = new Date(ts).toLocaleDateString('en-AU',{day:'2-digit',month:'short',year:'2-digit'});
+        const dist = data.dist ? `${data.dist}${data.dist_unit||''}` : '—';
+        return `<tr style="border-top:1px solid var(--border)">
+          <td style="padding:5px 0;color:var(--muted)">${ds}</td>
+          <td style="text-align:center;color:var(--muted)">${dist}</td>
+          <td style="text-align:center;color:var(--accent2)">${Math.round(ga)} <span style="font-size:10px;color:var(--muted)">SD ${gsd.toFixed(1)}</span></td>
+          <td style="text-align:center">${sa ? `${Math.round(sa)} <span style="font-size:10px;color:var(--muted)">SD ${ssd.toFixed(1)}</span>` : 'N/A'}</td>
+          <td style="text-align:center;color:${dc};font-weight:600">${diff!==null?(diff>=0?'+':'')+diff.toFixed(1)+' fps':'N/A'}</td>
+        </tr>`;
+      }).join('')}
+    </table>` :
+    '<div style="color:var(--muted);font-size:12px">No Garmin data imported for this target yet.</div>';
+
+  function card(icon, title, explain, content) {
+    return `<div style="width:100%;max-width:660px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;box-sizing:border-box">
+      <div style="font-size:14px;font-weight:700;margin-bottom:6px">${icon} ${title}</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:12px;padding:8px 10px;background:var(--surface2);border-radius:6px;border-left:3px solid var(--accent2)">${explain}</div>
+      ${content}
+    </div>`;
+  }
+
+  page.innerHTML = `
+    ${card('🎯','Select Target Unit',
+      'Choose which Shotmarker target unit to analyse. Each unit has its own sensor characteristics and history.',
+      `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">${tabsHTML}</div>${statsHTML}`)}
+    ${card('📡','Sensor Dropout Rate',
+      'Each shot should trigger all 8 sensors. A dropout means a sensor missed the acoustic shockwave. Front sensors (S0–S3) should never drop out. Back bottom sensors (S4, S7) ⚠ are critical — dropouts degrade left/right accuracy by up to 15mm.',
+      sensorBarsHTML)}
+    ${card('⚠️','Critical vs Non-Critical Dropouts',
+      'Critical dropouts (S4 or S7 missing) degrade the left/right position solution. Non-critical dropouts (S5 or S6) have minor impact.',
+      critBarsHTML)}
+    ${card('📐','Calibration Offset History',
+      'The cal_x/cal_y offset corrects sensor-to-target alignment. Large sudden changes suggest the unit was moved or knocked. Gradual drift may indicate the frame is shifting.',
+      calHTML)}
+    ${card('💨','Acoustic vs Garmin Velocity',
+      'Compares Shotmarker acoustic velocity estimates against Garmin Xero readings. Only shown when Garmin data has been imported for sessions on this target.',
+      velHTML)}
+    ${card('📊','Position Error Distribution (err_xy)',
+      'Shotmarker\'s internal position residual. Values near 0.0 are ideal. Values above 0.20 indicate the sensor timings did not agree well — Shotmarker flags these internally.',
+      errHTML)}`;
+}
+
 
 // ── Resize ────────────────────────────────────────────────────────────────────
 let rt;
