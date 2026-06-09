@@ -1,0 +1,2353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Shotmarker Viewer</title>
+<meta name="theme-color" content="#1c1c1e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Shotmarker">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+<style>
+  :root {
+    --bg: #1c1c1e;
+    --surface: #2c2c2e;
+    --surface2: #3a3a3c;
+    --border: #48484a;
+    --accent: #e8a020;
+    --accent2: #5b8dee;
+    --text: #f2f2f7;
+    --muted: #8e8e93;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh; overflow-x: hidden; user-select: none;
+  }
+
+  header {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 12px 16px; display: flex; align-items: center; gap: 10px;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo {
+    width: 30px; height: 30px; background: var(--accent); border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; font-weight: 900; color: #000; flex-shrink: 0;
+  }
+  header .title { font-size: 16px; font-weight: 700; }
+  header .sub { font-size: 11px; color: var(--muted); }
+  .hdr-btn {
+    margin-left: auto; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 7px; color: var(--text); padding: 6px 12px; font-size: 13px; cursor: pointer;
+  }
+
+  #load-screen {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: calc(100vh - 56px); padding: 40px 20px; text-align: center; gap: 20px;
+  }
+  .drop-zone {
+    border: 2px dashed var(--border); border-radius: 16px; padding: 44px 36px;
+    cursor: pointer; transition: all 0.2s; max-width: 420px; width: 100%;
+    background: var(--surface);
+  }
+  .drop-zone:hover, .drop-zone.drag-over { border-color: var(--accent); background: rgba(232,160,32,0.06); }
+  .drop-zone .icon { font-size: 44px; margin-bottom: 14px; }
+  .drop-zone h2 { font-size: 17px; margin-bottom: 6px; }
+  .drop-zone p { color: var(--muted); font-size: 13px; line-height: 1.5; }
+  .drop-zone input { display: none; }
+  #load-progress { color: var(--accent); font-size: 14px; min-height: 20px; }
+
+  .drive-btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: #1a73e8; color: #fff;
+    border: none; border-radius: 10px;
+    padding: 14px 24px; font-size: 15px; font-weight: 500;
+    cursor: pointer; text-decoration: none; text-align: left;
+    transition: background 0.15s; line-height: 1.4;
+  }
+  .drive-btn:hover { background: #1558b0; }
+  .drive-btn svg { flex-shrink: 0; }
+
+  .drive-btn-small {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #1a73e8; color: #fff;
+    border: none; border-radius: 7px;
+    padding: 6px 12px; font-size: 13px; font-weight: 600;
+    cursor: pointer; text-decoration: none;
+  }
+
+  .how-to {
+    max-width: 420px; width: 100%;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px 20px; text-align: left;
+  }
+  .how-to h3 { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+  .how-to ol { padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+  .how-to li { font-size: 13px; color: var(--text); line-height: 1.4; }
+  .how-to li span { color: var(--muted); }
+
+  #app { display: none; flex-direction: column; min-height: calc(100vh - 56px); }
+
+  #session-panel {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    max-height: 42vh; overflow-y: auto; flex-shrink: 0;
+  }
+  #session-panel::-webkit-scrollbar { width: 4px; }
+  #session-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .sp-top {
+    display: flex; align-items: center; gap: 8px; padding: 8px 10px 6px;
+    flex-wrap: wrap; position: sticky; top: 0; background: var(--surface);
+    z-index: 10; border-bottom: 1px solid var(--border);
+  }
+  #search-input {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); padding: 6px 10px; font-size: 13px; width: 150px; flex-shrink: 0;
+  }
+  #search-input:focus { outline: none; border-color: var(--accent); }
+  #dist-filters { display: flex; gap: 5px; flex-wrap: wrap; }
+  .filter-chip {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 14px;
+    padding: 4px 10px; font-size: 12px; cursor: pointer; color: var(--muted); white-space: nowrap;
+  }
+  .filter-chip.active { background: rgba(91,141,238,0.2); border-color: var(--accent2); color: var(--accent2); }
+
+  /* Vertical date list */
+  #session-list { display: flex; flex-direction: column; padding: 0; }
+  .date-group { display: flex; align-items: center; border-bottom: 1px solid var(--border); min-height: 48px; }
+  .date-lbl {
+    font-size: 11px; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;
+    padding: 8px 12px; min-width: 100px; flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    background: var(--surface2);
+    align-self: stretch; display: flex; align-items: center;
+  }
+  .date-row { display: flex; gap: 6px; padding: 6px 10px; flex-wrap: wrap; align-items: center; flex: 1; }
+  .session-btn {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 6px 11px; cursor: pointer; white-space: nowrap; color: var(--text);
+    font-size: 12px; flex-shrink: 0; text-align: left;
+  }
+  .session-btn.active { border-color: var(--accent); background: rgba(232,160,32,0.15); color: var(--accent); }
+  .s-name { font-weight: 600; font-size: 12px; }
+  .s-meta { font-size: 10px; color: var(--muted); margin-top: 1px; }
+  .session-btn.active .s-meta { color: rgba(232,160,32,0.65); }
+
+  #content { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 12px; gap: 12px; }
+
+  #session-info {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 13px 16px; width: 100%; max-width: 660px;
+  }
+  .info-top { display: flex; gap: 10px; flex-wrap: wrap; align-items: baseline; margin-bottom: 3px; }
+  .info-top h2 { font-size: 17px; font-weight: 700; }
+  .badge {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 5px;
+    padding: 2px 7px; font-size: 11px; color: var(--muted);
+  }
+  .badge.gold { background: rgba(232,160,32,0.15); border-color: rgba(232,160,32,0.4); color: var(--accent); }
+  .info-sub { font-size: 12px; color: var(--muted); margin-bottom: 9px; }
+  .stats-row { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; }
+  .stat { text-align: center; }
+  .stat .val { font-size: 20px; font-weight: 700; line-height: 1; }
+  .stat .lbl { font-size: 10px; color: var(--muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.4px; }
+  .val-gold { color: #e8a020; }
+  .val-blue { color: var(--accent2); }
+  .val-sd { color: #e8a020; font-size: 24px !important; }
+
+  /* Two-column info layout when Garmin data present */
+  .info-cols { display: flex; flex-direction: column; gap: 10px; }
+  .info-col-left { flex: 1; min-width: 0; }
+  .garmin-panel {
+    flex: 1 1 100%; 
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 9px; padding: 7px 12px;
+  }
+  .garmin-panel-title {
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.6px; color: var(--muted); margin-bottom: 6px;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .garmin-grid {
+    display: flex; gap: 0; justify-content: space-between;
+  }
+  .garmin-stat { text-align: center; flex: 1; }
+  .garmin-stat .gval { font-size: 15px; font-weight: 700; line-height: 1; color: var(--text); }
+  .garmin-stat .gval.sd-hl { font-size: 18px; color: #e8a020; }
+  .garmin-stat .gval.avg-hl { color: var(--accent2); }
+  .garmin-stat .glbl { font-size: 9px; color: var(--muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.4px; }
+
+  /* TARGET */
+  #target-wrap {
+    background: #000; border: 1px solid var(--border); border-radius: 14px;
+    overflow: hidden; width: 100%; max-width: 660px; position: relative;
+    touch-action: none;
+  }
+  #target-canvas { display: block; width: 100%; height: auto; cursor: grab; }
+  #target-canvas:active { cursor: grabbing; }
+  #zoom-controls {
+    position: absolute; top: 8px; right: 8px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .zoom-btn {
+    width: 34px; height: 34px; border-radius: 8px;
+    background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2);
+    color: #fff; font-size: 20px; font-weight: 300;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .zoom-btn:active { background: rgba(0,0,0,0.75); }
+  #zoom-label {
+    position: absolute; bottom: 7px; left: 10px;
+    font-size: 11px; color: rgba(255,255,255,0.4); pointer-events: none;
+  }
+  #theme-controls {
+    position: absolute; bottom: 8px; right: 8px;
+    display: flex; gap: 5px; align-items: center;
+  }
+  .theme-btn {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: rgba(0,0,0,0.45); border: 2px solid rgba(255,255,255,0.2);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 10px; color: #8c8c8c;
+    transition: border-color 0.15s;
+  }
+  .theme-btn.active { border-color: var(--accent); }
+  .theme-btn:hover { border-color: rgba(255,255,255,0.5); }
+
+  /* SHOT DETAIL */
+  #shot-detail {
+    display: none; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 9px 14px; width: 100%; max-width: 660px;
+    font-size: 13px; align-items: center; flex-wrap: wrap; gap: 12px;
+  }
+  #shot-detail .sd-num { font-size: 18px; font-weight: 700; color: var(--accent); }
+  .sc-pill {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border-radius: 50%;
+    font-weight: 700; font-size: 12px;
+    background: #2a2a2a; color: #fff;
+  }
+
+  /* Score strip cells */
+  .ss-cell {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 28px; height: 28px; border-radius: 5px;
+    font-weight: 700; font-size: 13px;
+    background: var(--surface2); color: var(--text);
+    border: 1px solid var(--border);
+    cursor: pointer;
+  }
+  .ss-cell:hover { border-color: var(--accent); }
+  .ss-cell.hl { background: var(--accent); color: #000; border-color: var(--accent); }
+  .ss-cell.sighter { background: var(--bg); color: var(--muted); font-size: 11px; }
+  #shot-detail .sd-dismiss { margin-left: auto; color: var(--muted); cursor: pointer; font-size: 20px; line-height: 1; }
+
+  /* SHOT TABLE */
+  #shot-table-wrap {
+    width: 100%; max-width: 660px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+  }
+  #shot-table-wrap h3 {
+    font-size: 11px; padding: 10px 14px; border-bottom: 1px solid var(--border);
+    color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase;
+  }
+  #shot-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  #shot-table th { padding: 7px 12px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); background: var(--surface2); }
+  #shot-table td { padding: 7px 12px; border-top: 1px solid var(--border); cursor: pointer; }
+  #shot-table tr.excluded td { opacity: 0.35; text-decoration: line-through; }
+  #shot-table tr.excluded td:last-child { text-decoration: none; }
+  .excl-btn { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 14px; padding: 0 2px; line-height: 1; }
+  .excl-btn:hover { color: #e03030; }
+  tr.excluded .excl-btn { color: #2a7a3b; }
+  tr.excluded .excl-btn:hover { color: #4caf50; }
+  #shot-table tr.hl td { background: rgba(232,160,32,0.12); }
+  #shot-table tr:hover td { background: rgba(255,255,255,0.04); }
+
+
+  .back-btn {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 7px; color: var(--muted); padding: 5px 11px;
+    font-size: 13px; cursor: pointer; white-space: nowrap;
+  }
+  .back-btn:hover { color: var(--text); border-color: var(--muted); }
+
+  #empty-state .big { font-size: 44px; }
+
+  #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 9px 18px; font-size: 13px; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 999; white-space: nowrap; }
+  #toast.show { opacity: 1; }
+
+  /* Nav tabs */
+  .nav-tab {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 7px;
+    color: var(--muted); padding: 5px 12px; font-size: 13px; font-weight: 600;
+    cursor: pointer; white-space: nowrap;
+  }
+  .nav-tab.active { background: rgba(91,141,238,0.2); border-color: var(--accent2); color: var(--accent2); }
+
+  /* Diagnostics page */
+  #diag-page {
+    display: none; flex-direction: column; min-height: calc(100vh - 56px);
+    padding: 16px; gap: 16px; align-items: center;
+  }
+  .diag-card {
+    width: 100%; max-width: 660px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px 18px;
+  }
+  .diag-card-title {
+    font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 4px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .diag-card-title .diag-icon { font-size: 18px; }
+  .diag-explain {
+    font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 12px;
+    padding: 8px 10px; background: var(--surface2); border-radius: 6px;
+    border-left: 3px solid var(--accent2);
+  }
+  .diag-target-tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+  .diag-target-tab {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 14px;
+    padding: 5px 14px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--muted);
+    white-space: nowrap;
+  }
+  .diag-target-tab.active { background: rgba(91,141,238,0.2); border-color: var(--accent2); color: var(--accent2); }
+
+  /* Bar charts */
+  .diag-bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .diag-bar-label { font-size: 11px; color: var(--muted); width: 80px; flex-shrink: 0; text-align: right; }
+  .diag-bar-track { flex: 1; background: var(--surface2); border-radius: 3px; height: 18px; position: relative; overflow: hidden; }
+  .diag-bar-fill { height: 100%; border-radius: 3px; transition: width 0.4s; }
+  .diag-bar-val { font-size: 11px; color: var(--text); width: 40px; flex-shrink: 0; font-weight: 600; }
+
+  /* Scatter / timeline */
+  .diag-chart-wrap { width: 100%; overflow-x: auto; }
+
+  /* Summary stat row */
+  .diag-stats { display: flex; gap: 0; flex-wrap: wrap; margin-top: 10px; }
+  .diag-stat { flex: 1; min-width: 80px; text-align: center; padding: 6px 4px; }
+  .diag-stat .dv { font-size: 20px; font-weight: 700; line-height: 1; }
+  .diag-stat .dl { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-top: 2px; }
+
+</style>
+</head>
+<body>
+
+<header>
+  <svg width="36" height="36" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;border-radius:7px">
+    <rect width="36" height="36" rx="7" fill="#1a1a1a"/>
+    <circle cx="18" cy="18" r="14" fill="white"/>
+    <circle cx="18" cy="18" r="11" fill="#1a1a1a"/>
+    <circle cx="18" cy="18" r="8"  fill="white"/>
+    <circle cx="18" cy="18" r="5"  fill="#1a1a1a"/>
+    <circle cx="18" cy="18" r="2"  fill="white"/>
+    <circle cx="18" cy="18" r="1"  fill="#1a1a1a"/>
+  </svg>
+  <div>
+    <div class="title">Shotmarker Viewer</div>
+    <div class="sub">Offline Plot Data</div>
+  </div>
+  <!-- Nav tabs -->
+  <div id="main-nav" style="display:none;margin-left:16px;gap:4px;flex-direction:row">
+    <button class="nav-tab active" id="tab-sessions" onclick="switchTab('sessions')">Sessions</button>
+    <button class="nav-tab" id="tab-diagnostics" onclick="switchTab('diagnostics')">Hardware</button>
+  </div>
+  <div style="margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+    <div style="display:flex;gap:6px;align-items:center">
+      <button id="back-btn" onclick="returnToStart()" class="back-btn" style="display:none">← New File</button>
+      <label>
+        <span id="btn-reload" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:6px 12px;font-size:13px;cursor:pointer;white-space:nowrap">⬇ Downloads</span>
+        <input type="file" id="file-input-hdr" accept=".tar" style="display:none">
+      </label>
+      <a id="drive-link-hdr" href="https://drive.google.com/drive/folders/16ziDZMijxlZAigotp-WxkjOVgWUoZRvt?usp=sharing" target="_blank" class="drive-btn-small" style="display:none">
+        <svg width="14" height="14" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
+          <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#fff"/>
+          <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#fff"/>
+          <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#fff"/>
+          <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#fff"/>
+          <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#fff"/>
+          <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 27h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#fff"/>
+        </svg>
+        Google Drive
+      </a>
+    </div>
+    <div id="open-filename" style="display:none;font-size:11px;color:var(--muted);text-align:right;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+    <div style="font-size:11px;color:var(--accent);text-align:right;font-weight:500">Lyndhurst Rifle Club 2026 — JG</div>
+  </div>
+</header>
+
+<div id="load-screen">
+
+  <!-- Step 1: Get the backup file from Drive -->
+  <a id="drive-link" href="https://drive.google.com/drive/folders/16ziDZMijxlZAigotp-WxkjOVgWUoZRvt?usp=sharing" target="_blank" class="drive-btn" style="width:100%;max-width:360px;box-sizing:border-box;justify-content:center;">
+    <svg width="20" height="20" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
+      <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
+      <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/>
+      <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/>
+      <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
+      <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
+      <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 27h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
+    </svg>
+    Open LyndhurstRC Cloud Drive &<br>Download Data File
+  </a>
+
+  <!-- Step 2: Load the file -->
+  <div class="drop-zone" id="drop-zone">
+    <div class="icon">
+      <svg width="90" height="72" viewBox="0 0 90 72" xmlns="http://www.w3.org/2000/svg">
+        <rect x="0" y="0" width="90" height="72" rx="6" fill="#1a1a1a" stroke="#555" stroke-width="1.5"/>
+        <circle cx="45" cy="36" r="30" fill="white"/>
+        <circle cx="45" cy="36" r="24" fill="#1a1a1a"/>
+        <circle cx="45" cy="36" r="18" fill="white"/>
+        <circle cx="45" cy="36" r="12" fill="#1a1a1a"/>
+        <circle cx="45" cy="36" r="6"  fill="white"/>
+        <circle cx="45" cy="36" r="3"  fill="#1a1a1a"/>
+      </svg>
+    </div>
+    <h2>Load Backup File</h2>
+    <div style="margin-top:16px;display:flex;justify-content:center;">
+      <label for="file-input" style="display:inline-flex;align-items:center;gap:10px;background:var(--accent);color:#000;font-weight:600;padding:14px 28px;border-radius:10px;font-size:15px;cursor:pointer;box-sizing:border-box;justify-content:center;">
+        <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3 7a2 2 0 0 1 2-2h4l2 2h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" fill="#1a73e8"/>
+          <path d="M3 10h18v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7z" fill="#4da3ff"/>
+        </svg>
+        Select Downloaded File
+      </label>
+    </div>
+    <input type="file" id="file-input" accept=".tar" style="position:absolute;left:-9999px;opacity:0;">
+    <input type="file" id="file-input-any" accept="*" style="position:absolute;left:-9999px;opacity:0;">
+  </div>
+  <div id="load-progress"></div>
+  <div style="font-size:12px;color:#8e8e93;text-align:center;max-width:420px;line-height:1.5;padding:0 20px;margin-top:8px"></div>
+</div>
+
+<div id="app">
+  <div id="session-panel">
+    <div class="sp-top">
+      <input type="text" id="search-input" placeholder="🔍  Search…" oninput="filterSessions()">
+      <div id="dist-filters"></div>
+    </div>
+    <div id="session-list"></div>
+  </div>
+
+  <div id="content">
+    <div id="empty-state">
+      <div class="big" style="display:flex;justify-content:center">
+        <svg width="90" height="72" viewBox="0 0 90 72" xmlns="http://www.w3.org/2000/svg">
+          <rect x="0" y="0" width="90" height="72" rx="6" fill="#1a1a1a" stroke="#555" stroke-width="1.5"/>
+          <circle cx="45" cy="36" r="30" fill="white"/>
+          <circle cx="45" cy="36" r="24" fill="#1a1a1a"/>
+          <circle cx="45" cy="36" r="18" fill="white"/>
+          <circle cx="45" cy="36" r="12" fill="#1a1a1a"/>
+          <circle cx="45" cy="36" r="6"  fill="white"/>
+          <circle cx="45" cy="36" r="3"  fill="#1a1a1a"/>
+        </svg>
+      </div>
+      <div style="text-align:center">Select a session above to view shots</div>
+    </div>
+
+    <div id="session-info" style="display:none"></div>
+
+    <div id="score-strip" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 14px;width:100%;max-width:660px;">
+      <div style="display:flex;gap:12px;align-items:baseline;margin-bottom:8px;flex-wrap:wrap">
+        <div id="ss-shots" style="font-size:13px;color:var(--muted)"></div>
+        <div id="ss-total" style="font-size:28px;font-weight:700;color:#e8a020;line-height:1"></div>
+        <div style="margin-left:auto;text-align:right">
+          <div id="ss-avg" style="font-size:13px;color:var(--accent2)"></div>
+          <div id="ss-sd" style="font-size:13px;color:var(--muted)"></div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;overflow-x:auto">
+        <div id="ss-grid" style="display:flex;flex-wrap:nowrap;gap:4px;flex:1;min-width:0"></div>
+      </div>
+    </div>
+
+    <div id="target-wrap" style="display:none">
+      <canvas id="target-canvas"></canvas>
+      <div id="zoom-controls">
+        <div class="zoom-btn" onclick="changeZoom(1.5)">+</div>
+        <div class="zoom-btn" onclick="changeZoom(1/1.5)">−</div>
+        <div class="zoom-btn" style="font-size:14px;font-weight:600" onclick="resetZoom()" title="Fit shots">⊡</div>
+        <div class="zoom-btn" style="font-size:13px;font-weight:600" onclick="zoomFullTarget()" title="Show full target">⛶</div>
+        <div class="zoom-btn" style="font-size:15px" onclick="saveImage()" title="Save image">💾</div>
+      </div>
+      <div id="theme-controls">
+        <div class="theme-btn active" onclick="setTheme('shotmarker',this)" title="Shotmarker Grey">⬤</div>
+        <div class="theme-btn" onclick="setTheme('paper',this)" title="Paper" style="color:#c8b060">⬤</div>
+        <div class="theme-btn" onclick="setTheme('dark',this)" title="High Contrast Dark" style="color:#444">⬤</div>
+        <div class="theme-btn" onclick="setTheme('green',this)" title="Night Vision" style="color:#00bb55">⬤</div>
+        <div class="theme-btn" onclick="setTheme('steel',this)" title="Blue Steel" style="color:#4488bb">⬤</div>
+      </div>
+      <div style="position:absolute;bottom:8px;left:8px">
+        <button onclick="saveStageImage()" style="background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#fff;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px">💾 Save Stage</button>
+      </div>
+    </div>
+
+    <div id="shot-detail">
+      <div class="sd-num" id="sd-num"></div>
+      <div id="sd-score"></div>
+      <div id="sd-xy" style="color:var(--muted)"></div>
+      <div id="sd-vel" style="color:var(--muted)"></div>
+      <div class="sd-dismiss" onclick="clearHighlight()">✕</div>
+    </div>
+
+    <div id="shot-table-wrap" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:8px">
+        <h3 style="margin:0">Shot log — tap row to highlight on target</h3>
+        <label id="garmin-btn" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:5px 11px;font-size:12px;cursor:pointer;white-space:nowrap">📥 Import Garmin CSV
+          <input type="file" id="garmin-input" accept=".csv" style="display:none">
+        </label>
+      </div>
+      <div id="garmin-library" style="display:none;margin-bottom:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px">
+        <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Garmin Library — select a file to apply to this session</div>
+        <div id="garmin-library-list"></div>
+      </div>
+      <div id="garmin-applied" style="font-size:12px;color:var(--muted);margin-bottom:6px;min-height:18px"></div>
+      <table id="shot-table">
+        <thead><tr><th>#</th><th>Score</th><th>Interval</th><th>fps</th><th>X mm</th><th>Y mm</th><th>θ°</th><th></th></tr></thead>
+        <tbody id="shot-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div id="diag-page"></div>
+
+<div id="toast"></div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+let sessions = [], shotData = {}, currentMeta = null, currentShots = [], currentSighters = [];
+let currentId = null, selectedShot = null;
+let allDistances = new Set(), activeDistFilter = null;
+let garminData = {};  // keyed by session id, value = array of {shotNum, fps, time}
+let excludedShots = {};  // keyed by session id, value = Set of shot indices
+let garminLibrary = []; // all imported Garmin CSVs: [{id, filename, sessionDate, shots, bulletWeight, shotCount}]
+
+// Zoom / pan
+let zoom = 1, panX = 0, panY = 0;
+let isPinching = false, lastPinchDist = 0;
+let isDragging = false, dragStartX = 0, dragStartY = 0, panStartX = 0, panStartY = 0;
+let tapMoved = false;
+
+// ── File loading ──────────────────────────────────────────────────────────────
+document.getElementById('file-input').addEventListener('change', e => { if (e.target.files[0]) loadTar(e.target.files[0]); });
+document.getElementById('file-input-any').addEventListener('change', e => { if (e.target.files[0]) loadTar(e.target.files[0]); });
+document.getElementById('file-input-hdr').addEventListener('change', e => { if (e.target.files[0]) loadTar(e.target.files[0]); });
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag-over'); if (e.dataTransfer.files[0]) loadTar(e.dataTransfer.files[0]); });
+
+async function loadTar(file) {
+  prog('Reading file…');
+  console.log('Loading file:', file.name, 'size:', file.size);
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  prog('Parsing archive…'); await tick();
+  const files = parseTar(bytes);
+  console.log('Files found in tar:', Object.keys(files).length, Object.keys(files).slice(0,5));
+  prog('Loading sessions…'); await tick();
+
+  let archive = {};
+  if (files['archive.txt']) {
+    try {
+      archive = JSON.parse(dec(files['archive.txt']));
+      console.log('Archive entries:', Object.keys(archive).length);
+    } catch(e) { console.error('archive.txt parse error:', e); }
+  } else {
+    console.error('archive.txt NOT FOUND in tar. Keys:', Object.keys(files).slice(0,10));
+  }
+
+  sessions = []; shotData = {}; allDistances = new Set();
+  let skipped = 0;
+
+  for (const id of Object.keys(archive)) {
+    const meta = archive[id];
+    const fname = `string-${id}.z`;
+    if (!files[fname]) { skipped++; continue; }
+    let parsed;
+    try { parsed = JSON.parse(dec(pako.inflate(files[fname]))); } catch(e) { console.error('parse error', fname, e); continue; }
+    const shots = parsed.shots || [];
+    const sighters = parsed.shots_invalid || [];
+    if (shots.length === 0 && sighters.length === 0) { skipped++; continue; }
+    const dateStr = new Date(parseInt(id)).toLocaleDateString('en-AU', { day:'2-digit', month:'short', year:'numeric' });
+    const dist = String(meta.distance);
+    allDistances.add(dist);
+    sessions.push({ id, ...meta, dateStr, dist });
+    shotData[id] = parsed;
+  }
+
+  console.log('Sessions loaded:', sessions.length, 'Skipped:', skipped);
+  sessions.sort((a,b) => b.ts - a.ts);
+  prog('');
+  document.getElementById('load-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('btn-reload').style.display = 'inline-block';
+  document.getElementById('drive-link-hdr').style.display = '';
+  document.getElementById('main-nav').style.display = 'flex';
+  document.getElementById('back-btn').style.display = '';
+  const fnEl = document.getElementById('open-filename');
+  fnEl.textContent = '📂 ' + file.name;
+  fnEl.style.display = 'block';
+  buildDistFilters();
+  filterSessions();
+}
+
+const dec = b => new TextDecoder().decode(b);
+const tick = () => new Promise(r => setTimeout(r, 20));
+
+function parseTar(buf) {
+  const files = {};
+  let o = 0;
+  while (o + 512 <= buf.length) {
+    const hdr = buf.slice(o, o+512);
+    if (hdr.every(b => b===0)) break;
+    let ne = 0; while (ne < 100 && hdr[ne] !== 0) ne++;
+    const name = new TextDecoder().decode(hdr.slice(0,ne));
+    const size = parseInt(new TextDecoder().decode(hdr.slice(124,136)).trim(), 8) || 0;
+    const type = String.fromCharCode(hdr[156]);
+    o += 512;
+    if (type !== '5' && size > 0) files[name] = buf.slice(o, o+size);
+    o += Math.ceil(size/512)*512;
+  }
+  return files;
+}
+
+function returnToStart() {
+  // Reset all state
+  sessions = []; shotData = {}; currentMeta = null; currentShots = []; currentSighters = [];
+  currentId = null; selectedShot = null; allDistances = new Set(); activeDistFilter = null;
+  garminData = {}; excludedShots = {}; garminLibrary = [];
+  zoom = 1; panX = 0; panY = 0;
+
+  document.getElementById('load-screen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('diag-page').style.display = 'none';
+  document.getElementById('main-nav').style.display = 'none';
+  document.getElementById('back-btn').style.display = 'none';
+  document.getElementById('btn-reload').style.display = 'none';
+  document.getElementById('drive-link-hdr').style.display = 'none';
+  document.getElementById('open-filename').style.display = 'none';
+  document.getElementById('file-input').value = '';
+  document.getElementById('file-input-any').value = '';
+  currentTab = 'sessions';
+}
+
+
+
+function prog(msg) { document.getElementById('load-progress').textContent = msg; }
+
+function resetApp() {
+  document.getElementById('load-screen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('btn-reload').style.display = 'none';
+  currentId = null;
+  document.getElementById('file-input').value = '';
+}
+
+// ── Distance filters ──────────────────────────────────────────────────────────
+function buildDistFilters() {
+  const sorted = Array.from(allDistances).sort((a,b) => parseFloat(a)-parseFloat(b));
+  const c = document.getElementById('dist-filters');
+  c.innerHTML = '';
+  [['All',''],...sorted.map(d=>[d,d])].forEach(([lbl,val],i) => {
+    const el = document.createElement('div');
+    el.className = 'filter-chip' + (i===0?' active':'');
+    el.textContent = lbl;
+    el.onclick = () => {
+      document.querySelectorAll('.filter-chip').forEach(x=>x.classList.remove('active'));
+      el.classList.add('active');
+      activeDistFilter = val || null;
+      filterSessions();
+    };
+    c.appendChild(el);
+  });
+}
+
+// ── Session list ──────────────────────────────────────────────────────────────
+function filterSessions() {
+  const q = document.getElementById('search-input').value.toLowerCase();
+  const list = sessions.filter(s => {
+    const t = !q || s.name.toLowerCase().includes(q) || s.target_name.toLowerCase().includes(q) || s.dateStr.toLowerCase().includes(q);
+    const d = !activeDistFilter || s.dist === activeDistFilter;
+    return t && d;
+  });
+  const c = document.getElementById('session-list');
+  c.innerHTML = '';
+  const byDate = {};
+  list.forEach(s => { if (!byDate[s.dateStr]) byDate[s.dateStr]=[]; byDate[s.dateStr].push(s); });
+  // Sort sessions within each date alphabetically by name
+  Object.values(byDate).forEach(arr => arr.sort((a,b) => (a.name||'').localeCompare(b.name||'')));
+  Object.entries(byDate).forEach(([date, slist]) => {
+    const g = document.createElement('div'); g.className = 'date-group';
+    const lbl = document.createElement('div'); lbl.className = 'date-lbl'; lbl.textContent = date;
+    const row = document.createElement('div'); row.className = 'date-row';
+    slist.forEach(s => {
+      const btn = document.createElement('div');
+      btn.className = 'session-btn' + (s.id===currentId?' active':'');
+      btn.innerHTML = `<div class="s-name">${s.name||'unnamed'}</div><div class="s-meta">${s.count} shots · ${s.dist} · ${s.time}</div>`;
+      btn.onclick = () => {
+        openSession(s.id);
+        btn.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      };
+      row.appendChild(btn);
+    });
+    g.appendChild(lbl); g.appendChild(row); c.appendChild(g);
+  });
+}
+
+// ── Open session ──────────────────────────────────────────────────────────────
+function openSession(id) {
+  currentId = id;
+  selectedShot = null;
+  resetZoom();
+  filterSessions();
+
+  currentMeta = sessions.find(s => s.id === id);
+  const data = shotData[id];
+  if (!data || !currentMeta) return;
+
+  // Sighters are in the main shots array with display_text 'S1', 'S2' etc.
+  // shots_invalid are off-target errors — don't plot these
+  const allShots = data.shots || [];
+  currentSighters = allShots.filter(s => typeof s.display_text === 'string' && s.display_text.startsWith('S'));
+  currentShots    = allShots.filter(s => !(typeof s.display_text === 'string' && s.display_text.startsWith('S')));
+
+  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('session-info').style.display = '';
+  document.getElementById('score-strip').style.display = '';
+  document.getElementById('target-wrap').style.display = '';
+  document.getElementById('shot-table-wrap').style.display = '';
+  document.getElementById('shot-detail').style.display = 'none';
+
+  // Restore garmin applied status if previously imported for this session
+  const appliedEntry = garminLibrary.find(g => g.id === garminData[currentId]?._libraryId);
+  const appliedEl = document.getElementById('garmin-applied');
+  if (appliedEl) {
+    if (appliedEntry) {
+      const count = garminData[currentId].filter(m => m !== null).length;
+      appliedEl.textContent = `✓ ${appliedEntry.filename} applied — ${count}/${currentShots.length} shots matched`;
+    } else {
+      appliedEl.textContent = '';
+    }
+  }
+  renderGarminLibrary();
+
+  renderInfo();
+  renderScoreStrip();
+  drawTarget();
+  renderTable();
+}
+
+// ── Group size in MOA ─────────────────────────────────────────────────────────
+function calcGroupMOA(shots, distMm) {
+  // Max spread: largest pairwise distance between calibration-corrected shot positions
+  const cal_x = shotData[currentId]?.cal_x || 0;
+  const cal_y = shotData[currentId]?.cal_y || 0;
+  const pts = shots.filter(s => s.x != null).map(s => [s.x + cal_x, s.y + cal_y]);
+  if (pts.length < 2) return null;
+  let maxD = 0;
+  for (let i = 0; i < pts.length; i++)
+    for (let j = i+1; j < pts.length; j++) {
+      const d = Math.sqrt((pts[i][0]-pts[j][0])**2 + (pts[i][1]-pts[j][1])**2);
+      if (d > maxD) maxD = d;
+    }
+  // 1 MOA at distance = distMm / 3438 mm
+  const moaMm = distMm / 3438;
+  return maxD / moaMm;
+}
+
+function distToMm(dist, unit) {
+  // dist in yards or metres → mm
+  if (unit === 'y') return dist * 914.4;
+  return dist * 1000; // metres
+}
+
+// ── Velocity sparkline SVG ────────────────────────────────────────────────────
+function velSparkline(vels, w, h) {
+  if (!vels || vels.length < 2) return '';
+  const mn = Math.min(...vels), mx = Math.max(...vels);
+  const range = mx - mn || 1;
+  const avg = vels.reduce((a,b)=>a+b,0)/vels.length;
+  const sd  = Math.sqrt(vels.map(v=>(v-avg)**2).reduce((a,b)=>a+b,0)/vels.length);
+  const pad = 2;
+  const bw = Math.max(2, (w - pad*2 - (vels.length-1)*2) / vels.length);
+  const bars = vels.map((v, i) => {
+    const bh = Math.max(2, ((v - mn) / range) * (h - pad*2 - 6));
+    const x = pad + i * (bw + 2);
+    const y = h - pad - bh;
+    const col = Math.abs(v - avg) <= sd ? 'var(--accent2)' : '#e8a020';
+    return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" rx="1" fill="${col}" opacity="0.85"/>`;
+  }).join('');
+  const avgY = (h - pad - Math.max(2, ((avg-mn)/range)*(h-pad*2-6))).toFixed(1);
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" style="display:block">
+    ${bars}
+    <line x1="${pad}" y1="${avgY}" x2="${w-pad}" y2="${avgY}" stroke="rgba(255,255,255,0.3)" stroke-width="1" stroke-dasharray="3,2"/>
+  </svg>`;
+}
+
+function velSparklineFullWidth(vels, h) {
+  if (!vels || vels.length < 2) return '';
+  const mn = Math.min(...vels), mx = Math.max(...vels);
+  const range = mx - mn || 1;
+  const avg = vels.reduce((a,b)=>a+b,0)/vels.length;
+  const sd  = Math.sqrt(vels.map(v=>(v-avg)**2).reduce((a,b)=>a+b,0)/vels.length);
+  const n = vels.length;
+  const W = 300, pad = 2;
+  const bw = (W - pad*2 - (n-1)*2) / n;
+  const bars = vels.map((v, i) => {
+    const bh = Math.max(2, ((v - mn) / range) * (h - pad*2 - 4));
+    const x = pad + i * (bw + 2);
+    const y = h - pad - bh;
+    const col = Math.abs(v - avg) <= sd ? 'var(--accent2)' : '#e8a020';
+    return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" rx="1" fill="${col}" opacity="0.85"/>`;
+  }).join('');
+  const avgY = (h - pad - Math.max(2, ((avg-mn)/range)*(h-pad*2-4))).toFixed(1);
+  return `<svg viewBox="0 0 ${W} ${h}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" style="display:block;width:100%;height:${h}px">
+    ${bars}
+    <line x1="${pad}" y1="${avgY}" x2="${W-pad}" y2="${avgY}" stroke="rgba(255,255,255,0.3)" stroke-width="1" stroke-dasharray="3,2"/>
+  </svg>`;
+}
+
+// ── Session info panel ────────────────────────────────────────────────────────
+function renderInfo() {
+  const meta = currentMeta, shots = activeShots();
+  const data = shotData[currentId];
+
+  // ── Shotmarker velocity stats (from device, stored in m/s → convert to fps) ──
+  const smVels = shots.filter(s => s.v && s.v > 0).map(s => s.v * FPS_CONV);
+
+  // ── Group size in MOA ──
+  let moaHTML = '';
+  if (shots.length >= 2 && data?.dist) {
+    const distMm = distToMm(data.dist, data.dist_unit || 'm');
+    const moa = calcGroupMOA(activeShots(), distMm);
+    if (moa !== null) {
+      moaHTML = `
+        <div class="garmin-stat">
+          <div class="gval" style="color:#c080e0">${moa.toFixed(2)}</div>
+          <div class="glbl">Group MOA</div>
+        </div>`;
+    }
+  }
+
+  // ── Garmin panel ──
+  let garminHTML = '';
+  const gArr = garminData[currentId];
+  if (gArr && gArr.some(Boolean)) {
+    // Only include fps for shots that are not excluded
+    const gVels = gArr.map((g, i) => (!isExcluded(i) && g) ? g.fps : null).filter(Boolean);
+    if (!gVels.length) { garminHTML = ''; }
+    else {
+    const n    = gVels.length;
+    const avg  = gVels.reduce((a,b)=>a+b,0) / n;
+    const sd   = Math.sqrt(gVels.map(v=>(v-avg)**2).reduce((a,b)=>a+b,0) / n);
+    const mx   = Math.max(...gVels);
+    const mn   = Math.min(...gVels);
+    const sprd = mx - mn;
+    const grains = gArr._bulletWeight || data?.bullet_weight || 155.5;
+    const ke = 0.5 * grains * avg * avg / 450380;
+    const spark = velSparklineFullWidth(gVels, 36);
+
+    garminHTML = `
+      <div class="garmin-panel">
+        <div class="garmin-panel-title">📡 Garmin Xero</div>
+        <div class="garmin-grid">
+          <div class="garmin-stat">
+            <div class="gval">${n}</div>
+            <div class="glbl">Shots</div>
+          </div>
+          <div class="garmin-stat">
+            <div class="gval avg-hl">${Math.round(avg)}</div>
+            <div class="glbl">Avg fps</div>
+          </div>
+          <div class="garmin-stat">
+            <div class="gval sd-hl">${sd.toFixed(1)}</div>
+            <div class="glbl">Std Dev</div>
+          </div>
+          <div class="garmin-stat">
+            <div class="gval">${Math.round(sprd)}</div>
+            <div class="glbl">Spread</div>
+          </div>
+          <div class="garmin-stat">
+            <div class="gval">${Math.round(mx)}</div>
+            <div class="glbl">Max fps</div>
+          </div>
+          <div class="garmin-stat">
+            <div class="gval">${Math.round(mn)}</div>
+            <div class="glbl">Min fps</div>
+          </div>
+          <div class="garmin-stat">
+            <div class="gval">${ke.toFixed(0)}</div>
+            <div class="glbl">Avg KE ft·lb</div>
+          </div>
+        </div>
+        ${spark ? `<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px">
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px">Velocity string — <span style="color:var(--accent2)">■</span> within 1 SD &nbsp;<span style="color:#e8a020">■</span> outside 1 SD</div>
+          ${spark}
+        </div>` : ''}
+      </div>`;
+    } // end else (gVels.length > 0)
+  }
+
+  const grp = meta.group ? `<span class="badge gold">${meta.group}</span>` : '';
+
+  let smStatHTML = `
+    <div class="garmin-stat">
+      <div class="gval">${shots.length}</div>
+      <div class="glbl">Shots</div>
+    </div>`;
+
+  if (smVels.length > 1) {
+    const avg = smVels.reduce((a,b)=>a+b,0)/smVels.length;
+    const sd  = Math.sqrt(smVels.map(v=>(v-avg)**2).reduce((a,b)=>a+b,0)/smVels.length);
+    const es  = Math.max(...smVels) - Math.min(...smVels);
+    const mx  = Math.max(...smVels);
+    const mn  = Math.min(...smVels);
+    smStatHTML += `
+      <div class="garmin-stat">
+        <div class="gval avg-hl">${Math.round(avg)}</div>
+        <div class="glbl">Avg fps</div>
+      </div>
+      <div class="garmin-stat">
+        <div class="gval sd-hl">${sd.toFixed(1)}</div>
+        <div class="glbl">Std Dev</div>
+      </div>
+      <div class="garmin-stat">
+        <div class="gval">${Math.round(es)}</div>
+        <div class="glbl">Spread</div>
+      </div>
+      <div class="garmin-stat">
+        <div class="gval">${Math.round(mx)}</div>
+        <div class="glbl">Max fps</div>
+      </div>
+      <div class="garmin-stat">
+        <div class="gval">${Math.round(mn)}</div>
+        <div class="glbl">Min fps</div>
+      </div>`;
+  }
+  smStatHTML += moaHTML;
+
+  const leftHTML = `
+    <div class="garmin-panel">
+      <div class="garmin-panel-title"><svg width="14" height="14" viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" style="vertical-align:middle;margin-right:4px;flex-shrink:0"><circle cx="7" cy="7" r="7" fill="white"/><circle cx="7" cy="7" r="5.5" fill="#1a1a1a"/><circle cx="7" cy="7" r="4" fill="white"/><circle cx="7" cy="7" r="2.5" fill="#1a1a1a"/><circle cx="7" cy="7" r="1.2" fill="white"/><circle cx="7" cy="7" r="0.6" fill="#1a1a1a"/></svg> ${meta.name||'Unnamed'} ${grp} <span class="badge" style="font-size:9px">${meta.face_id}</span></div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:6px">${meta.target_name} · ${meta.dist} · ${meta.dateStr} ${meta.time}</div>
+      <div class="garmin-grid">${smStatHTML}</div>
+    </div>`;
+
+  document.getElementById('session-info').innerHTML = garminHTML
+    ? `<div class="info-cols"><div class="info-col-left">${leftHTML}</div>${garminHTML}</div>`
+    : leftHTML;
+}
+
+// ── Score strip ───────────────────────────────────────────────────────────────
+function renderScoreStrip() {
+  const shots = activeShots(), sighters = currentSighters;
+  const allShots = currentShots; // used for grid display (shows excluded greyed)
+
+  // Shot count
+  document.getElementById('ss-shots').textContent = `${shots.length} shots`;
+
+  // Total score formatted like Shotmarker: "68-7V" or "42-3X"
+  let numeric = 0, xCount = 0, vCount = 0;
+  shots.forEach(s => {
+    const sc = String(s.score ?? '');
+    if (sc === 'X') { numeric += 6; xCount++; }
+    else if (sc === 'V') { numeric += 5; vCount++; }
+    else { numeric += parseInt(sc) || 0; }
+  });
+  let totalStr = String(numeric);
+  if (xCount > 0) totalStr += `-${xCount}X`;
+  else if (vCount > 0) totalStr += `-${vCount}V`;
+  document.getElementById('ss-total').textContent = totalStr;
+
+  // Velocity avg & SD — Garmin takes priority, Shotmarker v is in m/s
+  const vels = shots.map((s,i) => {
+    const g = getGarminFps(i);
+    if (g) return g;
+    if (s.v && s.v > 0) return s.v * FPS_CONV;
+    return null;
+  }).filter(Boolean);
+  if (vels.length > 1) {
+    const avg = vels.reduce((a,b)=>a+b,0)/vels.length;
+    const sd = Math.sqrt(vels.map(v=>(v-avg)**2).reduce((a,b)=>a+b,0)/vels.length);
+    document.getElementById('ss-avg').textContent = `avg ${Math.round(avg)}`;
+    document.getElementById('ss-sd').textContent = `SD ${sd.toFixed(1)}`;
+  } else {
+    document.getElementById('ss-avg').textContent = '';
+    document.getElementById('ss-sd').textContent = '';
+  }
+
+  // Shot grid — each shot as a tappable cell, sighters greyed out first
+  const grid = document.getElementById('ss-grid');
+  grid.innerHTML = '';
+  sighters.forEach((s, i) => {
+    const cell = document.createElement('div');
+    cell.className = 'ss-cell sighter';
+    cell.style.flexDirection = 'column';
+    cell.style.gap = '1px';
+    cell.style.height = '36px';
+    cell.innerHTML = `<span style="font-size:9px;font-weight:400;opacity:0.6;line-height:1">S${i+1}</span><span style="line-height:1">—</span>`;
+    cell.title = `Sighter ${i+1}`;
+    grid.appendChild(cell);
+  });
+  allShots.forEach((s, i) => {
+    const cell = document.createElement('div');
+    const excl = isExcluded(i);
+    cell.className = 'ss-cell' + (i === selectedShot && !excl ? ' hl' : '');
+    if (excl) cell.style.opacity = '0.25';
+    const lbl = s.display_text != null ? String(s.display_text) : String(i+1);
+    cell.innerHTML = `<span style="font-size:9px;font-weight:400;opacity:0.6;line-height:1">${lbl}</span><span style="line-height:1${excl?' text-decoration:line-through':''}">${String(s.score ?? '?')}</span>`;
+    cell.style.flexDirection = 'column';
+    cell.style.gap = '1px';
+    cell.style.height = '36px';
+    cell.title = excl ? `Shot ${lbl} (excluded)` : `Shot ${lbl}`;
+    cell.onclick = () => highlightShot(i);
+    grid.appendChild(cell);
+  });
+}
+// ── Official ICFRA target dimensions ─────────────────────────────────────────
+// Source: ICFRA Rule Book Appendix D3
+// All values are radii in mm (diameter/2)
+// IS targets: V ring = central bull (superV scores same as V)
+// IFX targets: X = superV ring, 6 = central bull
+// ── Official ICFRA target ring radii (mm from centre) ────────────────────────
+// ── Ring definitions from Shotmarker software targetfaces.js ─────────────────
+// r = scoring boundary radii in mm = (diam/2 + line/2) — outer edge of ring line
+// board = target face size in mm
+// l = score labels innermost outward
+const OFFICIAL_RINGS = {
+  'IS300m':  { board:{w:1200,h:1200}, r:[37,72,142,212,300],     l:['V','5','4','3','2'] },
+  'IS500m':  { board:{w:1800,h:1800}, r:[75.5,148,333,500,663],  l:['V','5','4','3','2'] },
+  'IS500y':  { board:{w:1800,h:1800}, r:[68,133,303,457.5,663],  l:['V','5','4','3','2'] },
+  'IS600y':  { board:{w:1800,h:1800}, r:[75.5,148,303,457.5,663],l:['V','5','4','3','2'] },
+  'IS600m':  { board:{w:1800,h:1800}, r:[83,163,333,500,663],    l:['V','5','4','3','2'] },
+  'ISLR':    { board:{w:2400,h:1800}, r:[133.5,261,413.5,560,921],l:['V','5','4','3','2'] },
+  'UKTR300': { board:{w:1200,h:1200}, r:[37,72,142,212,300],     l:['V','5','4','3','2'] },
+  'IFX300m': { board:{w:1200,h:1200}, r:[18.5,37,72,142,212,300],l:['X','6','5','4','3','2'] },
+  'IFX500m': { board:{w:1800,h:1800}, r:[37.5,75.5,148,333,500,663],l:['X','6','5','4','3','2'] },
+  'IFX500y': { board:{w:1800,h:1800}, r:[33.5,68,133,303,457.5,663],l:['X','6','5','4','3','2'] },
+  'IFX600y': { board:{w:1800,h:1800}, r:[37.5,75.5,148,303,457.5,663],l:['X','6','5','4','3','2'] },
+  'IFX600m': { board:{w:1800,h:1800}, r:[41.5,83,163,333,500,663],l:['X','6','5','4','3','2'] },
+  'IFXLR':   { board:{w:2400,h:1800}, r:[67.5,133.5,261,413.5,560,921],l:['X','6','5','4','3','2'] },
+};
+
+function getTargetDef(faceId) {
+  return OFFICIAL_RINGS[faceId] || null;
+}
+
+function calcScale(faceId, allShots, canvasW, zoom) {
+  const td = getTargetDef(faceId);
+  if (!td || allShots.length === 0) return { sc: 1, displayR: 500, td };
+
+  const cal_x = (shotData[currentId]?.cal_x) || 0;
+  const cal_y = (shotData[currentId]?.cal_y) || 0;
+  const maxR = Math.max(...allShots.map(s => Math.sqrt((s.x+cal_x)**2 + (s.y+cal_y)**2)));
+
+  // Find the first official ring boundary >= maxR
+  // This ring contains all shots — scale so it fills 85% of canvas
+  let displayR = td.r[td.r.length - 1];
+  for (let i = 0; i < td.r.length; i++) {
+    if (td.r[i] >= maxR) { displayR = td.r[i]; break; }
+  }
+
+  const sc = (canvasW * 0.425 / displayR) * zoom;
+  return { sc, displayR, td };
+}
+
+// ── Colour themes ─────────────────────────────────────────────────────────────
+const THEMES = {
+  shotmarker: { bg:'#111', target:'#8c8c8c', ring:'#ffffff', label:'rgba(255,255,255,0.40)', dot:'#1e1e1e', dotS:'#3a3a3a', num:'#ffffff', sight:'#4a4a4a', sightL:'rgba(200,200,200,0.8)', hl:'#f5c518' },
+  paper:      { bg:'#c8b89a', target:'#e8e0d0', ring:'#2a1a0a', label:'rgba(0,0,0,0.30)', dot:'#1a0a00', dotS:'#5a3a20', num:'#e8e0d0', sight:'#8a7a60', sightL:'rgba(80,60,40,0.8)', hl:'#c8901a' },
+  dark:       { bg:'#000', target:'#1a1a1a', ring:'#ffffff', label:'rgba(255,255,255,0.35)', dot:'#ffffff', dotS:'#aaaaaa', num:'#000000', sight:'#666666', sightL:'rgba(180,180,180,0.8)', hl:'#f5c518' },
+  green:      { bg:'#050f05', target:'#0a1a0a', ring:'#00dd66', label:'rgba(0,220,100,0.40)', dot:'#001a00', dotS:'#00aa44', num:'#00ff88', sight:'#1a3a1a', sightL:'rgba(0,200,80,0.7)', hl:'#f5c518' },
+  steel:      { bg:'#0f1820', target:'#1e2d3d', ring:'#a0c8e8', label:'rgba(160,200,230,0.40)', dot:'#0a1520', dotS:'#2a4a6a', num:'#c8e0f0', sight:'#1a3a5a', sightL:'rgba(120,180,220,0.8)', hl:'#f5c518' },
+};
+let currentTheme = THEMES.shotmarker;
+
+function setTheme(name, el) {
+  currentTheme = THEMES[name];
+  document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  drawTarget();
+}
+
+// ── Draw target ───────────────────────────────────────────────────────────────
+function drawTarget() {
+  if (!currentMeta) return;
+  const canvas = document.getElementById('target-canvas');
+  const wrap   = document.getElementById('target-wrap');
+  const dpr    = window.devicePixelRatio || 1;
+  const disp   = wrap.clientWidth || 600;
+
+  canvas.style.width  = disp + 'px';
+  canvas.style.height = disp + 'px';
+  canvas.width  = disp * dpr;
+  canvas.height = disp * dpr;
+
+  const ctx = canvas.getContext('2d');
+  ctx.save();
+  ctx.scale(dpr, dpr);
+  const W = disp;
+
+  ctx.fillStyle = currentTheme.bg;
+  ctx.fillRect(0, 0, W, W);
+
+  // Get ring boundaries from this session's score data
+  const allShots = [...currentShots, ...currentSighters].filter(s => s.x != null);
+  const activeOnly = activeShots().filter(s => s.x != null);
+  const scaleShots = activeOnly.length ? activeOnly : allShots;
+  const { sc, displayR, td } = calcScale(currentMeta.face_id, scaleShots, W, zoom);
+  if (!td) { ctx.restore(); return; }
+
+  const cx = W / 2 + panX;
+  const cy = W / 2 + panY;
+
+  // Grey target background — use actual board dimensions from Shotmarker
+  const bw = (td.board ? td.board.w : displayR*2) * sc;
+  const bh = (td.board ? td.board.h : displayR*2) * sc;
+  ctx.fillStyle = currentTheme.target;
+  ctx.fillRect(cx - bw/2, cy - bh/2, bw, bh);
+
+  // Draw rings — r * sc = pixel radius from centre
+  ctx.strokeStyle = currentTheme.ring;
+  ctx.lineWidth = 1.5;
+  td.r.forEach(r => {
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * sc, 0, Math.PI * 2);
+    ctx.stroke();
+  });
+
+  // Zone labels — uniform font size based on the second ring width
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = currentTheme.label;
+  const bounds = [0, ...td.r];
+  const labelFs = Math.max(10, Math.round((bounds[2] - bounds[1]) * sc * 0.70));
+  ctx.font = `bold ${labelFs}px -apple-system,sans-serif`;
+  for (let i = 0; i < td.l.length; i++) {
+    const mid = (bounds[i] + td.r[i]) / 2 * sc;
+    if (i === 0) {
+      ctx.fillText(td.l[i], cx, cy);
+    } else {
+      ctx.fillText(td.l[i], cx + mid * 0.9, cy);
+      ctx.fillText(td.l[i], cx - mid * 0.9, cy);
+    }
+  }
+
+  // Shot dots — plotted at (x + cal_x, y + cal_y) matching Shotmarker's scoring logic
+  const cal_x = shotData[currentId]?.cal_x || 0;
+  const cal_y = shotData[currentId]?.cal_y || 0;
+  const DOT = Math.max(6, Math.round(W / 60));
+  const nfs = DOT * 1.1;
+
+  currentSighters.forEach((s, i) => {
+    if (s.x == null) return;
+    const px = cx + (s.x + cal_x) * sc, py = cy - (s.y + cal_y) * sc;
+    if (px < -DOT || px > W+DOT || py < -DOT || py > W+DOT) return;
+    const lbl = s.display_text != null ? String(s.display_text) : `S${i+1}`;
+    dot(ctx, px, py, DOT, currentTheme.sight, currentTheme.dotS, lbl, nfs, currentTheme.sightL);
+  });
+
+  currentShots.forEach((s, i) => {
+    if (s.x == null) return;
+    const px = cx + (s.x + cal_x) * sc, py = cy - (s.y + cal_y) * sc;
+    if (px < -DOT || px > W+DOT || py < -DOT || py > W+DOT) return;
+    const excl = isExcluded(i);
+    if (i === selectedShot && !excl) {
+      ctx.beginPath();
+      ctx.arc(px, py, DOT + Math.max(3, DOT*0.5), 0, Math.PI*2);
+      ctx.fillStyle = currentTheme.hl;
+      ctx.fill();
+    }
+    const lbl = s.display_text != null ? String(s.display_text) : String(i+1);
+    if (excl) {
+      // Hollow circle for excluded shots
+      ctx.beginPath();
+      ctx.arc(px, py, DOT, 0, Math.PI*2);
+      ctx.strokeStyle = currentTheme.dot;
+      ctx.lineWidth = 1.5;
+      ctx.globalAlpha = 0.3;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    } else {
+      dot(ctx, px, py, DOT, currentTheme.dot, currentTheme.dotS, lbl, nfs, currentTheme.num);
+    }
+  });
+
+  // Red cross at group centroid — active shots only
+  const validShots = activeShots().filter(s => s.x != null);
+  if (validShots.length > 1) {
+    const mx = validShots.reduce((a,s) => a + s.x + cal_x, 0) / validShots.length;
+    const my = validShots.reduce((a,s) => a + s.y + cal_y, 0) / validShots.length;
+    const gx = cx + mx * sc, gy = cy - my * sc;
+    const arm = Math.max(4, DOT * 0.6);
+    ctx.save();
+    ctx.strokeStyle = '#e03030';
+    ctx.lineWidth = Math.max(1.5, DOT * 0.25);
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(gx - arm, gy); ctx.lineTo(gx + arm, gy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(gx, gy - arm); ctx.lineTo(gx, gy + arm); ctx.stroke();
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+function dot(ctx, x, y, r, fill, stroke, lbl, fs, lc) {
+  ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
+  ctx.fillStyle = fill; ctx.fill();
+  ctx.strokeStyle = stroke; ctx.lineWidth = 0.8; ctx.stroke();
+  ctx.font = `bold ${fs}px -apple-system,sans-serif`;
+  ctx.fillStyle = lc; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(lbl, x, y);
+}
+
+// ── Save image ────────────────────────────────────────────────────────────────
+function saveStageImage() {
+  if (!currentMeta) return;
+  const meta = currentMeta;
+  const shots = activeShots();
+  const data  = shotData[currentId];
+  const dpr   = window.devicePixelRatio || 1;
+  const W     = 900; // fixed output width in logical px
+  const PAD   = 24;
+  const COL   = '#f2f2f7';
+  const MUTED = '#8e8e93';
+  const BG    = '#1c1c1e';
+  const SURF  = '#2c2c2e';
+  const SURF2 = '#3a3a3c';
+  const AMBER = '#e8a020';
+  const BLUE  = '#5b8dee';
+  const GREEN = '#4caf50';
+
+  // ── Build rows for shot log ──
+  const hasGarmin = garminData[currentId]?.some(Boolean);
+  const shotRows  = currentShots.map((s,i) => {
+    const excl  = isExcluded(i);
+    const sc    = String(s.score ?? '?');
+    const lbl   = s.display_text != null ? String(s.display_text) : String(i+1);
+    const fps   = resolvedFps(s, i);
+    const src   = resolvedFpsSource(s, i);
+    const theta = s.theta != null ? (s.theta*180/Math.PI).toFixed(2)+'°' : '-';
+    const allOrdered = [...currentSighters, ...currentShots];
+    const prev  = allOrdered[currentSighters.length + i - 1];
+    const intv  = (prev?.ts && s.ts) ? formatInterval(s.ts - prev.ts) : '-';
+    return { lbl, sc, fps, src, intv, theta, excl, x: s.x, y: s.y };
+  });
+
+  // ── Measure height needed ──
+  const TARGET_SIZE   = W - PAD*2;
+  const HEADER_H      = 100;
+  const INFO_ROW_H    = shots.length > 0 ? 60 : 0;
+  const GARMIN_ROW_H  = hasGarmin ? 70 : 0;
+  const STRIP_H       = 56;
+  const TABLE_ROW_H   = 22;
+  const TABLE_ROWS    = currentSighters.length + currentShots.length;
+  const TABLE_H       = TABLE_ROWS * TABLE_ROW_H + 28;
+  const TOTAL_H       = HEADER_H + INFO_ROW_H + GARMIN_ROW_H + STRIP_H + 8 + TARGET_SIZE + 12 + TABLE_H + PAD*3;
+
+  const out = document.createElement('canvas');
+  out.width  = W * dpr;
+  out.height = TOTAL_H * dpr;
+  const ctx  = out.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  ctx.fillStyle = BG;
+  ctx.fillRect(0, 0, W, TOTAL_H);
+
+  let y = PAD;
+
+  // ── Header ──
+  ctx.fillStyle = COL;
+  ctx.font = 'bold 28px -apple-system,sans-serif';
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ctx.fillText(meta.name || 'Unnamed', PAD, y);
+
+  // Score total top-right
+  let numeric = 0, xCount = 0, vCount = 0;
+  currentShots.forEach(s => {
+    const sc = String(s.score??'');
+    if (sc==='X'){numeric+=6;xCount++;}
+    else if(sc==='V'){numeric+=5;vCount++;}
+    else numeric+=parseInt(sc)||0;
+  });
+  let totalStr = String(numeric);
+  if (xCount>0) totalStr+=`-${xCount}X`;
+  else if (vCount>0) totalStr+=`-${vCount}V`;
+  ctx.fillStyle = AMBER;
+  ctx.font = 'bold 38px -apple-system,sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText(totalStr, W-PAD, y);
+
+  y += 36;
+  ctx.fillStyle = MUTED;
+  ctx.font = '14px -apple-system,sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText(`${meta.target_name}  ·  ${meta.dist}  ·  ${meta.dateStr} ${meta.time}`, PAD, y);
+  y += 20;
+
+  // Watermark
+  ctx.fillStyle = 'rgba(232,160,32,0.4)';
+  ctx.font = '11px -apple-system,sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText('Lyndhurst Rifle Club 2026 — JG', W-PAD, PAD+4);
+
+  y = HEADER_H;
+
+  // ── Session info stats row ──
+  const smVels = shots.filter(s=>s.v>0).map(s=>s.v*FPS_CONV);
+  const statItems = [];
+  statItems.push({ val: String(shots.length), lbl: 'SHOTS', col: COL });
+  if (smVels.length>1) {
+    const avg=smVels.reduce((a,b)=>a+b,0)/smVels.length;
+    const sd=Math.sqrt(smVels.map(v=>(v-avg)**2).reduce((a,b)=>a+b,0)/smVels.length);
+    const es=Math.max(...smVels)-Math.min(...smVels);
+    statItems.push({ val: Math.round(avg).toString(), lbl: 'AVG FPS', col: BLUE });
+    statItems.push({ val: sd.toFixed(1), lbl: 'STD DEV', col: AMBER });
+    statItems.push({ val: Math.round(es).toString(), lbl: 'SPREAD', col: COL });
+    statItems.push({ val: Math.round(Math.max(...smVels)).toString(), lbl: 'MAX FPS', col: COL });
+    statItems.push({ val: Math.round(Math.min(...smVels)).toString(), lbl: 'MIN FPS', col: COL });
+  }
+  if (shots.length>=2 && data?.dist) {
+    const distMm=distToMm(data.dist, data.dist_unit||'m');
+    const moa=calcGroupMOA(shots, distMm);
+    if (moa) statItems.push({ val: moa.toFixed(2), lbl: 'GROUP MOA', col: '#c080e0' });
+  }
+  if (statItems.length) {
+    const INFO_H = 56;
+    ctx.fillStyle = SURF;
+    ctx.fillRect(PAD, y, W-PAD*2, INFO_H);
+    const statW = (W-PAD*2) / statItems.length;
+    statItems.forEach((st, i) => {
+      const sx2 = PAD + i*statW + statW/2;
+      ctx.fillStyle = st.col;
+      ctx.font = 'bold 18px -apple-system,sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(st.val, sx2, y+18);
+      ctx.fillStyle = MUTED;
+      ctx.font = '9px -apple-system,sans-serif';
+      ctx.fillText(st.lbl, sx2, y+42);
+    });
+    y += INFO_H + 4;
+  }
+
+  // ── Garmin panel ──
+  if (hasGarmin) {
+    const gArr = garminData[currentId];
+    const gVels = gArr.filter(Boolean).map(g=>g.fps);
+    if (gVels.length>1) {
+      const ga=gVels.reduce((a,b)=>a+b,0)/gVels.length;
+      const gsd=Math.sqrt(gVels.map(v=>(v-ga)**2).reduce((a,b)=>a+b,0)/gVels.length);
+      const ges=Math.max(...gVels)-Math.min(...gVels);
+      const grains = gArr._bulletWeight || 155.5;
+      const ke = 0.5*grains*ga*ga/450380;
+      const gStats = [
+        { val: String(gVels.length), lbl: 'SHOTS', col: COL },
+        { val: Math.round(ga).toString(), lbl: 'AVG FPS', col: BLUE },
+        { val: gsd.toFixed(1), lbl: 'STD DEV', col: AMBER },
+        { val: Math.round(ges).toString(), lbl: 'SPREAD', col: COL },
+        { val: Math.round(Math.max(...gVels)).toString(), lbl: 'MAX FPS', col: COL },
+        { val: Math.round(Math.min(...gVels)).toString(), lbl: 'MIN FPS', col: COL },
+        { val: ke.toFixed(0), lbl: 'KE FT·LB', col: COL },
+      ];
+      const GARM_H = 66;
+      ctx.fillStyle = SURF2;
+      ctx.fillRect(PAD, y, W-PAD*2, GARM_H);
+      // Label
+      ctx.fillStyle = MUTED;
+      ctx.font = 'bold 9px -apple-system,sans-serif';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+      ctx.fillText('📡 GARMIN XERO', PAD+8, y+5);
+      const gStatW = (W-PAD*2) / gStats.length;
+      gStats.forEach((st, i) => {
+        const sx2 = PAD + i*gStatW + gStatW/2;
+        ctx.fillStyle = st.col;
+        ctx.font = 'bold 16px -apple-system,sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(st.val, sx2, y+30);
+        ctx.fillStyle = MUTED;
+        ctx.font = '9px -apple-system,sans-serif';
+        ctx.fillText(st.lbl, sx2, y+52);
+      });
+      y += GARM_H + 4;
+    }
+  }
+
+  // ── Score strip ──
+  ctx.fillStyle = SURF;
+  ctx.fillRect(PAD, y, W-PAD*2, STRIP_H);
+  const cellW = Math.min(36, (W-PAD*2-8) / Math.max(currentShots.length + currentSighters.length, 1) - 3);
+  const cellH = 30;
+  let sx = PAD + 4;
+  const stripY = y + (STRIP_H-cellH)/2;
+  [...currentSighters.map((s,i)=>({s,isSighter:true,i})), ...currentShots.map((s,i)=>({s,isSighter:false,i}))].forEach(({s,isSighter,i}) => {
+    ctx.fillStyle = isSighter ? SURF2 : (i===selectedShot?AMBER:SURF2);
+    roundRect(ctx, sx, stripY, cellW, cellH, 4); ctx.fill();
+    const lbl = isSighter ? `S${i+1}` : (s.display_text!=null?String(s.display_text):String(i+1));
+    const sc  = isSighter ? '—' : String(s.score??'?');
+    ctx.fillStyle = isSighter ? MUTED : (i===selectedShot?'#000':MUTED);
+    ctx.font = `${Math.max(7,cellW*0.35)}px -apple-system,sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillText(lbl, sx+cellW/2, stripY+2);
+    ctx.fillStyle = isSighter ? MUTED : (i===selectedShot?'#000':COL);
+    ctx.font = `bold ${Math.max(8,cellW*0.45)}px -apple-system,sans-serif`;
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(sc, sx+cellW/2, stripY+cellH-2);
+    sx += cellW + 3;
+  });
+  y += STRIP_H + 8;
+
+  // ── Target plot ──
+  const targetCanvas = document.getElementById('target-canvas');
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(PAD, y, TARGET_SIZE, TARGET_SIZE);
+  ctx.clip();
+  ctx.drawImage(targetCanvas, PAD, y, TARGET_SIZE, TARGET_SIZE);
+  ctx.restore();
+  y += TARGET_SIZE + 12;
+
+  // ── Shot log table ──
+  const tableCols = [
+    {label:'#',    w:30,  align:'center'},
+    {label:'Score',w:44,  align:'center'},
+    {label:'fps',  w:hasGarmin?58:50, align:'center'},
+    {label:'Intv', w:44,  align:'center'},
+    {label:'X mm', w:50,  align:'right'},
+    {label:'Y mm', w:50,  align:'right'},
+    {label:'θ°',   w:46,  align:'right'},
+  ];
+  const tableW = W-PAD*2;
+  const totalColW = tableCols.reduce((a,c)=>a+c.w,0);
+  const flex = tableW - totalColW;
+
+  // Header row
+  ctx.fillStyle = SURF2;
+  ctx.fillRect(PAD, y, tableW, 24);
+  let cx = PAD + 4;
+  tableCols.forEach(c => {
+    ctx.fillStyle = MUTED;
+    ctx.font = 'bold 9px -apple-system,sans-serif';
+    ctx.textAlign = c.align; ctx.textBaseline = 'middle';
+    ctx.fillText(c.label.toUpperCase(), cx + (c.align==='right'?c.w:c.align==='center'?c.w/2:0), y+12);
+    cx += c.w;
+  });
+  y += 24;
+
+  // Data rows
+  const allTableRows = [
+    ...currentSighters.map((s,i) => ({s, isSighter:true, idx:i})),
+    ...currentShots.map((s,i) => ({s, isSighter:false, idx:i}))
+  ];
+
+  allTableRows.forEach(({s, isSighter, idx}, rowIdx) => {
+    const rowY = y + rowIdx * TABLE_ROW_H;
+    if (rowIdx % 2 === 0) { ctx.fillStyle = 'rgba(255,255,255,0.02)'; ctx.fillRect(PAD, rowY, tableW, TABLE_ROW_H); }
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(PAD, rowY); ctx.lineTo(W-PAD, rowY); ctx.stroke();
+
+    const excl = !isSighter && isExcluded(idx);
+    ctx.globalAlpha = excl ? 0.3 : 1;
+
+    const lbl   = isSighter ? `S${idx+1}` : (s.display_text!=null?String(s.display_text):String(idx+1));
+    const sc    = isSighter ? '—' : String(s.score??'?');
+    const fps   = isSighter ? (garminData[currentId]?._sighterFps?.[idx] ? Math.round(garminData[currentId]._sighterFps[idx]) : (s.v>0?Math.round(s.v*FPS_CONV):'-')) : resolvedFps(s,idx);
+    const fpsIsGarmin = !isSighter && resolvedFpsSource(s,idx)==='garmin';
+    const theta = s.theta!=null?(s.theta*180/Math.PI).toFixed(1)+'°':'-';
+    const allOrd = [...currentSighters,...currentShots];
+    const prevS  = allOrd[currentSighters.length+(isSighter?idx-1:currentSighters.length+idx-1)];
+    const intv  = (prevS?.ts&&s.ts) ? formatInterval(s.ts-prevS.ts) : '-';
+
+    const vals = [lbl, sc, fps?String(fps):'-', intv, s.x!=null?s.x.toFixed(1):'-', s.y!=null?s.y.toFixed(1):'-', theta];
+    const colors = [MUTED, isSighter?MUTED:COL, fpsIsGarmin?GREEN:(isSighter?MUTED:COL), MUTED, MUTED, MUTED, MUTED];
+
+    cx = PAD + 4;
+    tableCols.forEach((c,ci) => {
+      ctx.fillStyle = colors[ci];
+      ctx.font = `${ci===1?'bold ':''  }11px -apple-system,sans-serif`;
+      ctx.textAlign = c.align; ctx.textBaseline = 'middle';
+      ctx.fillText(vals[ci], cx+(c.align==='right'?c.w:c.align==='center'?c.w/2:0), rowY+TABLE_ROW_H/2);
+      cx += c.w;
+    });
+    ctx.globalAlpha = 1;
+  });
+
+  // ── Trigger download with save dialog ──
+  const fname = `${(meta.name||'session').replace(/\s+/g,'-')}_${meta.target_name}_${meta.dateStr.replace(/\s+/g,'-')}.png`;
+  out.toBlob(blob => {
+    // Use File System Access API if available (shows save dialog with location choice)
+    if (window.showSaveFilePicker) {
+      window.showSaveFilePicker({
+        suggestedName: fname,
+        types: [{ description: 'PNG Image', accept: {'image/png': ['.png']} }]
+      }).then(handle => handle.createWritable()).then(writable => {
+        writable.write(blob); return writable.close();
+      }).then(() => showToast('Image saved')).catch(e => { if (e.name!=='AbortError') showToast('Save failed'); });
+    } else {
+      // Fallback: standard download
+      const link = document.createElement('a');
+      link.download = fname;
+      link.href = URL.createObjectURL(blob);
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(link.href), 5000);
+      showToast('Image downloaded');
+    }
+  }, 'image/png');
+}
+
+function saveImage() {
+  if (!currentMeta) return;
+  const meta = currentMeta;
+  const shots = currentShots;
+  const targetCanvas = document.getElementById('target-canvas');
+  const cw = targetCanvas.width;
+  const ch = targetCanvas.height;
+  const dpr = window.devicePixelRatio || 1;
+  const dispW = cw / dpr;
+  const PAD = Math.round(dispW * 0.04);
+  const HEADER_H = Math.round(dispW * 0.22);
+  const out = document.createElement('canvas');
+  out.width  = cw;
+  out.height = ch + HEADER_H * dpr;
+  const ctx = out.getContext('2d');
+  ctx.fillStyle = '#1c1c1e';
+  ctx.fillRect(0, 0, out.width, out.height);
+  ctx.save();
+  ctx.scale(dpr, dpr);
+  ctx.fillStyle = '#f2f2f7';
+  ctx.font = `bold ${Math.round(dispW * 0.055)}px -apple-system, sans-serif`;
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ctx.fillText(meta.name || 'Unnamed', PAD, PAD);
+  ctx.fillStyle = '#8e8e93';
+  ctx.font = `${Math.round(dispW * 0.034)}px -apple-system, sans-serif`;
+  ctx.fillText(`${meta.target_name}  ·  ${meta.dist}  ·  ${meta.dateStr} ${meta.time}`, PAD, PAD + Math.round(dispW * 0.065));
+  let numeric = 0, xCount = 0, vCount = 0;
+  shots.forEach(s => {
+    const sc = String(s.score ?? '');
+    if (sc === 'X') { numeric += 6; xCount++; }
+    else if (sc === 'V') { numeric += 5; vCount++; }
+    else { numeric += parseInt(sc) || 0; }
+  });
+  let totalStr = String(numeric);
+  if (xCount > 0) totalStr += `-${xCount}X`;
+  else if (vCount > 0) totalStr += `-${vCount}V`;
+  ctx.fillStyle = '#e8a020';
+  ctx.font = `bold ${Math.round(dispW * 0.075)}px -apple-system, sans-serif`;
+  ctx.textAlign = 'right';
+  ctx.fillText(totalStr, dispW - PAD, PAD);
+  const vels = shots.map((s,i) => { const g = getGarminFps(i); if (g) return g; if (s.v && s.v > 0) return s.v * FPS_CONV; return null; }).filter(Boolean);
+  if (vels.length > 1) {
+    const avg = vels.reduce((a,b)=>a+b,0)/vels.length;
+    const sd = Math.sqrt(vels.map(v=>(v-avg)**2).reduce((a,b)=>a+b,0)/vels.length);
+    ctx.fillStyle = '#5b8dee';
+    ctx.font = `${Math.round(dispW * 0.034)}px -apple-system, sans-serif`;
+    ctx.fillText(`avg ${Math.round(avg)} fps  SD ${sd.toFixed(1)}`, dispW - PAD, PAD + Math.round(dispW * 0.065));
+  }
+  const seqY = PAD + Math.round(dispW * 0.13);
+  const cellW = Math.round(dispW * 0.042);
+  const cellH = Math.round(dispW * 0.050);
+  let sx = PAD;
+  shots.forEach((s, i) => {
+    const lbl = s.display_text != null ? String(s.display_text) : String(i+1);
+    const sc  = String(s.score ?? '?');
+    ctx.fillStyle = i === selectedShot ? '#e8a020' : '#3a3a3c';
+    roundRect(ctx, sx, seqY, cellW, cellH, 3); ctx.fill();
+    ctx.fillStyle = i === selectedShot ? '#000' : '#8e8e93';
+    ctx.font = `${Math.round(cellW * 0.38)}px -apple-system, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillText(lbl, sx + cellW/2, seqY + 2);
+    ctx.fillStyle = i === selectedShot ? '#000' : '#f2f2f7';
+    ctx.font = `bold ${Math.round(cellW * 0.52)}px -apple-system, sans-serif`;
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(sc, sx + cellW/2, seqY + cellH - 2);
+    sx += cellW + 3;
+    if (sx + cellW > dispW - PAD) sx = PAD;
+  });
+  ctx.fillStyle = 'rgba(232,160,32,0.5)';
+  ctx.font = `${Math.round(dispW * 0.028)}px -apple-system, sans-serif`;
+  ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+  ctx.fillText('Lyndhurst Rifle Club 2026 — JG', dispW - PAD, HEADER_H - 6);
+  ctx.restore();
+  ctx.drawImage(targetCanvas, 0, HEADER_H * dpr);
+  const fname = `${(meta.name||'session').replace(/\s+/g,'-')}_${meta.dateStr.replace(/\s+/g,'-')}.png`;
+  const link = document.createElement('a');
+  link.download = fname;
+  link.href = out.toDataURL('image/png');
+  link.click();
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.lineTo(x+w-r, y);
+  ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+  ctx.lineTo(x+w, y+h-r);
+  ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+  ctx.lineTo(x+r, y+h);
+  ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+  ctx.lineTo(x, y+r);
+  ctx.quadraticCurveTo(x, y, x+r, y);
+  ctx.closePath();
+}
+function changeZoom(f) {
+  zoom = Math.min(Math.max(zoom*f, 0.1), 14);
+  if (zoom <= 1) { panX=0; panY=0; }
+  clampPan(); drawTarget();
+}
+function resetZoom() { zoom=1; panX=0; panY=0; drawTarget(); }
+function zoomFullTarget() {
+  if (!currentMeta) return;
+  const td = getTargetDef(currentMeta.face_id);
+  if (!td) return;
+  const allShots = [...currentShots, ...currentSighters].filter(s => s.x != null);
+  if (!allShots.length) return;
+  const W = document.getElementById('target-canvas').offsetWidth;
+  // calcScale at zoom=1 gives sc that fits displayR to 42.5% of canvas width
+  // We want the full board half-dimension to fit in 45% of canvas width
+  const { sc: sc1, displayR } = calcScale(currentMeta.face_id, allShots, W, 1);
+  const boardR = Math.max(td.board.w, td.board.h) / 2;
+  zoom = (displayR / boardR) * 0.9;
+  panX = 0; panY = 0;
+  drawTarget();
+}
+function clampPan() {
+  if (zoom <= 1) { panX = 0; panY = 0; return; }
+  const disp = getCanvasDisp();
+  const mx = disp * (zoom - 1) / 2;
+  panX = Math.max(-mx, Math.min(mx, panX));
+  panY = Math.max(-mx, Math.min(mx, panY));
+}
+function getCanvasDisp() {
+  return document.getElementById('target-wrap').clientWidth || 600;
+}
+
+// Touch
+const CV = document.getElementById('target-canvas');
+CV.addEventListener('touchstart', e => {
+  e.preventDefault();
+  if (e.touches.length===2) {
+    isPinching=true; isDragging=false;
+    lastPinchDist = pdist(e);
+  } else {
+    isDragging=true; isPinching=false; tapMoved=false;
+    dragStartX=e.touches[0].clientX; dragStartY=e.touches[0].clientY;
+    panStartX=panX; panStartY=panY;
+  }
+},{ passive:false });
+
+CV.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (isPinching && e.touches.length===2) {
+    const d = pdist(e);
+    zoom = Math.min(Math.max(zoom*(d/lastPinchDist),0.1),14);
+    lastPinchDist=d; clampPan(); drawTarget();
+  } else if (isDragging && e.touches.length===1) {
+    const dx=e.touches[0].clientX-dragStartX, dy=e.touches[0].clientY-dragStartY;
+    if (Math.abs(dx)>4||Math.abs(dy)>4) tapMoved=true;
+    panX=panStartX+dx; panY=panStartY+dy; clampPan(); drawTarget();
+  }
+},{ passive:false });
+
+CV.addEventListener('touchend', e => {
+  e.preventDefault();
+  if (isPinching) { isPinching=false; return; }
+  if (isDragging && !tapMoved && e.changedTouches.length===1) {
+    handleTap(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+  }
+  isDragging=false;
+},{ passive:false });
+
+// Mouse
+let mdown=false, mmoved=false;
+CV.addEventListener('mousedown', e => { mdown=true; mmoved=false; dragStartX=e.clientX; dragStartY=e.clientY; panStartX=panX; panStartY=panY; });
+CV.addEventListener('mousemove', e => { if(!mdown)return; const dx=e.clientX-dragStartX,dy=e.clientY-dragStartY; if(Math.abs(dx)>3||Math.abs(dy)>3){mmoved=true;} panX=panStartX+dx; panY=panStartY+dy; clampPan(); drawTarget(); });
+CV.addEventListener('mouseup', e => { if(!mmoved) handleTap(e.clientX, e.clientY); mdown=false; });
+CV.addEventListener('wheel', e => { e.preventDefault(); changeZoom(e.deltaY<0?1.15:1/1.15); },{ passive:false });
+
+function pdist(e) {
+  const dx=e.touches[0].clientX-e.touches[1].clientX, dy=e.touches[0].clientY-e.touches[1].clientY;
+  return Math.sqrt(dx*dx+dy*dy);
+}
+
+function getDisplayR() { return 500; } // unused, kept for compat
+
+function getEffectiveZoom() {
+  if (!currentMeta) return 1;
+  const data = shotData[currentId];
+  const faceW = data.width || 1800;
+  const faceH = data.height || 1800;
+  const disp = getCanvasDisp();
+  return (disp * 0.90 / Math.max(faceW, faceH)) * zoom;
+}
+
+function handleTap(clientX, clientY) {
+  if (!currentId || !currentShots.length) return;
+  const rect = CV.getBoundingClientRect();
+  const disp = rect.width;
+  const allShots2 = [...currentShots, ...currentSighters].filter(s => s.x != null);
+  const { sc, td } = calcScale(currentMeta.face_id, allShots2, disp, zoom);
+  if (!td) return;
+  const cx = disp / 2 + panX;
+  const cy = disp / 2 + panY;
+  const ox = clientX - rect.left;
+  const oy = clientY - rect.top;
+  const DOT = Math.max(6, Math.round(disp / 60));
+  let found = -1;
+  for (let i = currentShots.length - 1; i >= 0; i--) {
+    const s = currentShots[i]; if (s.x == null) continue;
+    const cal_x = shotData[currentId]?.cal_x || 0;
+    const cal_y = shotData[currentId]?.cal_y || 0;
+    if (Math.hypot(ox - (cx + (s.x+cal_x)*sc), oy - (cy - (s.y+cal_y)*sc)) < DOT * 2.5) { found = i; break; }
+  }
+  if (found === -1) clearHighlight();
+  else highlightShot(found);
+}
+
+function highlightShot(idx) {
+  selectedShot = idx;
+  drawTarget();
+  const s = currentShots[idx];
+  const sc = String(s.score??'?');
+  document.getElementById('shot-detail').style.display = 'flex';
+  document.getElementById('sd-num').textContent = `Shot #${idx+1}`;
+  document.getElementById('sd-score').innerHTML = `<span class="sc-pill">${sc}</span>`;
+  document.getElementById('sd-xy').textContent = `X: ${s.x?.toFixed(1)} mm   Y: ${s.y?.toFixed(1)} mm`;
+  const fps = resolvedFps(s, idx);
+  const src = resolvedFpsSource(s, idx);
+  document.getElementById('sd-vel').textContent = fps ? `${fps} fps${src==='garmin'?' (Garmin)':''}` : '';
+  document.querySelectorAll('#shot-tbody tr').forEach((tr,i) => tr.classList.toggle('hl', i===idx));
+  const rows = document.querySelectorAll('#shot-tbody tr');
+  if (rows[idx]) rows[idx].scrollIntoView({ block:'nearest', behavior:'smooth' });
+  // Update score strip highlight
+  document.querySelectorAll('#ss-grid .ss-cell:not(.sighter)').forEach((c,i) => c.classList.toggle('hl', i===idx));
+  const cells = document.querySelectorAll('#ss-grid .ss-cell:not(.sighter)');
+  if (cells[idx]) cells[idx].scrollIntoView({ block:'nearest', behavior:'smooth' });
+}
+
+function clearHighlight() {
+  selectedShot = null;
+  document.getElementById('shot-detail').style.display = 'none';
+  document.querySelectorAll('#shot-tbody tr').forEach(tr=>tr.classList.remove('hl'));
+  document.querySelectorAll('#ss-grid .ss-cell').forEach(c=>c.classList.remove('hl'));
+  drawTarget();
+}
+
+// ── Shot table ────────────────────────────────────────────────────────────────
+// ── Shot exclusion ────────────────────────────────────────────────────────────
+function isExcluded(index) {
+  return excludedShots[currentId]?.has(index) || false;
+}
+
+function toggleExclude(index) {
+  if (!excludedShots[currentId]) excludedShots[currentId] = new Set();
+  if (excludedShots[currentId].has(index)) {
+    excludedShots[currentId].delete(index);
+  } else {
+    excludedShots[currentId].add(index);
+    if (selectedShot === index) { selectedShot = null; }
+  }
+  renderInfo();
+  renderScoreStrip();
+  renderTable();
+  drawTarget();
+}
+
+function activeShots() {
+  return currentShots.filter((_, i) => !isExcluded(i));
+}
+
+
+document.getElementById('garmin-input').addEventListener('change', e => {
+  if (e.target.files[0]) importGarmin(e.target.files[0]);
+  e.target.value = '';  // allow re-selecting same file
+});
+
+function parseGarminCSV(text) {
+  // Normalise line endings and strip BOM
+  text = text.replace(/\uFEFF/g, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const lines = text.split('\n');
+
+  // Parse session date from "DATE, "9 May 2026 at 6:42 pm""
+  let sessionDate = null;
+  for (const line of lines) {
+    const m = line.match(/^DATE,\s*"?(\d+\s+\w+\s+\d{4}\s+at\s+[\d:]+\s*[apm]+)"?/i);
+    if (m) {
+      const cleaned = m[1].replace(' at ', ' ').replace(/\s+/g,' ').trim();
+      sessionDate = new Date(cleaned);
+      break;
+    }
+  }
+
+  // Parse bullet weight
+  let bulletWeight = null;
+  for (const line of lines) {
+    const m = line.match(/^PROJECTILE WEIGHT\(GRAINS\),\s*([\d.]+)/i);
+    if (m) { bulletWeight = parseFloat(m[1]); break; }
+  }
+
+  // Parse shot rows: #,SPEED,Δ AVG,KE,PF,TIME,...
+  const shots = [];
+  let inShots = false;
+  for (const line of lines) {
+    if (line.startsWith('#,SPEED')) { inShots = true; continue; }
+    if (!inShots) continue;
+    if (!line.trim() || line.startsWith('-') || line.startsWith('AVERAGE') ||
+        line.startsWith('STD') || line.startsWith('SPREAD') || line.startsWith('SESSION') ||
+        line.startsWith('PROJEC') || line.startsWith('AVG') || line.startsWith('DATE') ||
+        line.startsWith('All')) continue;
+
+    const cols = line.split(',').map(c => c.trim());
+    const num = parseInt(cols[0]);
+    const fps = parseFloat(cols[1]);
+    const timeStr = cols[5];  // e.g. "2:16:35 pm"
+    if (isNaN(num) || isNaN(fps) || !timeStr) continue;
+
+    // Build full Date from session date + shot time
+    let shotDate = null;
+    if (sessionDate) {
+      const tm = timeStr.match(/(\d+):(\d+):(\d+)\s*(am|pm)/i);
+      if (tm) {
+        let h = parseInt(tm[1]), min = parseInt(tm[2]), sec = parseInt(tm[3]);
+        const ampm = tm[4].toLowerCase();
+        if (ampm === 'pm' && h !== 12) h += 12;
+        if (ampm === 'am' && h === 12) h = 0;
+        shotDate = new Date(sessionDate);
+        shotDate.setHours(h, min, sec, 0);
+      }
+    }
+    shots.push({ shotNum: num, fps, timeStr, ts: shotDate ? shotDate.getTime() : null });
+  }
+  return { sessionDate, shots, bulletWeight };
+}
+
+function importGarmin(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const { sessionDate, shots, bulletWeight } = parseGarminCSV(e.target.result);
+    if (!shots.length) { showToast('No shot data found in CSV'); return; }
+
+    // Add to library if not already present (match by date + shot count)
+    const dateStr = sessionDate ? sessionDate.toLocaleDateString('en-AU',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '?';
+    const existing = garminLibrary.find(g => g.dateStr === dateStr && g.shots.length === shots.length);
+    if (!existing) {
+      garminLibrary.push({
+        id: Date.now(),
+        filename: file.name,
+        dateStr,
+        sessionDate,
+        shots,
+        bulletWeight,
+        shotCount: shots.length
+      });
+    }
+
+    renderGarminLibrary();
+    showToast(`Garmin CSV added to library — ${shots.length} shots`);
+  };
+  reader.readAsText(file);
+}
+
+function renderGarminLibrary() {
+  const lib = document.getElementById('garmin-library');
+  const list = document.getElementById('garmin-library-list');
+  if (!lib || !list) return;
+
+  if (!garminLibrary.length) { lib.style.display = 'none'; return; }
+  lib.style.display = '';
+
+  const appliedId = garminData[currentId]?._libraryId || null;
+
+  list.innerHTML = garminLibrary.map(g => {
+    const isApplied = appliedId === g.id;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;margin-bottom:3px;
+        background:${isApplied?'rgba(91,141,238,0.15)':'var(--bg)'};
+        border:1px solid ${isApplied?'var(--accent2)':'transparent'}">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:600;color:${isApplied?'var(--accent2)':'var(--text)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${g.filename}</div>
+        <div style="font-size:10px;color:var(--muted)">${g.dateStr} · ${g.shotCount} shots${g.bulletWeight?` · ${g.bulletWeight}gr`:''}</div>
+      </div>
+      <button onclick="toggleGarminLibraryEntry(${g.id})" style="
+        background:${isApplied?'rgba(224,48,48,0.15)':'rgba(76,175,80,0.15)'};
+        border:1px solid ${isApplied?'#e03030':'#4caf50'};
+        color:${isApplied?'#e03030':'#4caf50'};
+        border-radius:6px;padding:3px 10px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap">
+        ${isApplied?'✕ Remove':'✓ Apply'}
+      </button>
+    </div>`;
+  }).join('');
+}
+
+function toggleGarminLibraryEntry(libId) {
+  if (!currentId) return;
+  const appliedId = garminData[currentId]?._libraryId || null;
+
+  if (appliedId === libId) {
+    // Remove — clear garmin data for this session
+    delete garminData[currentId];
+    const applied = document.getElementById('garmin-applied');
+    if (applied) applied.textContent = '';
+  } else {
+    // Apply
+    applyGarminFromLibrary(libId);
+    return; // applyGarminFromLibrary handles re-render
+  }
+
+  renderGarminLibrary();
+  renderInfo();
+  renderScoreStrip();
+  renderTable();
+  drawTarget();
+  if (currentTab === 'diagnostics') renderDiagnostics();
+}
+
+function applyGarminFromLibrary(libId) {
+  if (!currentId) return;
+  const entry = garminLibrary.find(g => g.id === libId);
+  if (!entry) return;
+
+  const smShots = currentShots;
+  const matched = matchGarminShots(smShots, entry.shots);
+
+  const rawShots = shotData[currentId]?.shots || [];
+  let sighterOffset = 0;
+  for (const s of rawShots) {
+    if (s.sighter || String(s.display_text || '').startsWith('S')) sighterOffset++;
+    else break;
+  }
+  const sighterFps = entry.shots.slice(0, sighterOffset).map(g => g ? g.fps : null);
+
+  garminData[currentId] = matched;
+  garminData[currentId]._bulletWeight = entry.bulletWeight;
+  garminData[currentId]._sighterFps = sighterFps;
+  garminData[currentId]._libraryId = libId;
+
+  const count = matched.filter(m => m !== null).length;
+  const applied = document.getElementById('garmin-applied');
+  if (applied) applied.textContent = `✓ ${entry.filename} applied — ${count}/${smShots.length} shots matched`;
+
+  renderGarminLibrary();
+  renderInfo();
+  renderScoreStrip();
+  renderTable();
+  drawTarget();
+  if (currentTab === 'diagnostics') renderDiagnostics();
+  showToast(`Garmin applied — ${count} shots matched`);
+}
+
+function matchGarminShots(smShots, garminShots) {
+  // Garmin records every trigger pull in order with no sighter labels.
+  // Count how many shots in the raw session data come before the first scored shot
+  // — this is the true offset into the Garmin sequence.
+  const rawShots = shotData[currentId]?.shots || [];
+  let sighterOffset = 0;
+  for (const s of rawShots) {
+    if (s.sighter || String(s.display_text || '').startsWith('S')) {
+      sighterOffset++;
+    } else {
+      break; // stop at the first scored shot
+    }
+  }
+
+  const result = new Array(smShots.length).fill(null);
+  for (let i = 0; i < smShots.length; i++) {
+    const garminIdx = sighterOffset + i;
+    if (garminIdx < garminShots.length) {
+      result[i] = garminShots[garminIdx];
+    }
+  }
+  return result;
+}
+
+function getGarminFps(shotIndex) {
+  if (!currentId || !garminData[currentId]) return null;
+  const g = garminData[currentId][shotIndex];
+  return g ? g.fps : null;
+}
+
+const FPS_CONV = 3.28084; // m/s to fps
+
+function resolvedFps(shot, index) {
+  // Garmin takes priority when imported (dedicated chrono)
+  const gfps = getGarminFps(index);
+  if (gfps) return Math.round(gfps);
+  // Fall back to Shotmarker v (stored in m/s → convert to fps)
+  if (shot.v && shot.v > 0) return Math.round(shot.v * FPS_CONV);
+  return null;
+}
+
+function resolvedFpsSource(shot, index) {
+  if (getGarminFps(index)) return 'garmin';
+  if (shot.v && shot.v > 0) return 'sm';
+  return 'none';
+}
+
+function formatInterval(ms) {
+  if (ms == null || ms <= 0) return '-';
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60), rem = s % 60;
+  return `${m}m ${rem}s`;
+}
+
+function renderTable() {
+  const shots=currentShots, sighters=currentSighters;
+  const allOrdered = [...sighters, ...shots];
+  let html = '';
+
+  // Sighters first, at the top
+  if (sighters.length) {
+    const sighterFps = garminData[currentId]?._sighterFps || [];
+    html += sighters.map((s,i) => {
+      const lbl = s.display_text != null ? String(s.display_text) : `S${i+1}`;
+      let fps = '-';
+      if (sighterFps[i]) {
+        fps = `<span style="color:#4caf50">${Math.round(sighterFps[i])}</span><span style="font-size:9px;opacity:0.55;margin-left:2px;color:#4caf50">G</span>`;
+      } else if (s.v && s.v > 0) {
+        fps = String(Math.round(s.v * FPS_CONV));
+      }
+      const prev = allOrdered[i - 1];
+      const interval = (prev?.ts && s.ts) ? formatInterval(s.ts - prev.ts) : '-';
+      return `<tr style="opacity:0.5">
+        <td style="color:var(--muted)">${lbl}</td>
+        <td><span class="sc-pill" style="background:#444">—</span></td>
+        <td style="color:var(--muted);font-size:11px">${interval}</td>
+        <td>${fps}</td>
+        <td>${s.x!=null?s.x.toFixed(1):'-'}</td>
+        <td>${s.y!=null?s.y.toFixed(1):'-'}</td>
+        <td></td>
+        <td></td>
+      </tr>`;
+    }).join('');
+  }
+
+  // Scored shots after
+  html += shots.map((s,i) => {
+    const sc=String(s.score??'?');
+    const lbl = s.display_text != null ? String(s.display_text) : String(i+1);
+    const fps = resolvedFps(s, i);
+    const src = resolvedFpsSource(s, i);
+    const fpsCell = fps
+      ? `<span style="${src==='garmin'?'color:#4caf50':''}">${fps}</span><span style="font-size:9px;opacity:0.55;margin-left:2px${src==='garmin'?';color:#4caf50':''}">${src==='garmin'?'G':''}</span>`
+      : '-';
+    const orderIdx = sighters.length + i;
+    const prev = allOrdered[orderIdx - 1];
+    const interval = (prev?.ts && s.ts) ? formatInterval(s.ts - prev.ts) : '-';
+    const excl = isExcluded(i);
+    const exclIcon = excl ? '↩' : '✕';
+    const exclTitle = excl ? 'Re-include shot' : 'Exclude shot';
+    const thetaDeg = s.theta != null ? (s.theta * 180 / Math.PI).toFixed(2) : '-';
+    const thetaCol = s.theta != null ? (Math.abs(s.theta * 180 / Math.PI) > 3 ? '#e03030' : Math.abs(s.theta * 180 / Math.PI) > 1.5 ? '#e8a020' : 'var(--muted)') : 'var(--muted)';
+    return `<tr class="${excl?'excluded':''}" onclick="highlightShot(${i})">
+      <td style="color:var(--muted);font-weight:600">${lbl}</td>
+      <td><span class="sc-pill">${sc}</span></td>
+      <td style="color:var(--muted);font-size:11px">${interval}</td>
+      <td>${fpsCell}</td>
+      <td>${s.x!=null?s.x.toFixed(1):'-'}</td>
+      <td>${s.y!=null?s.y.toFixed(1):'-'}</td>
+      <td style="font-size:11px;color:${thetaCol}">${thetaDeg}</td>
+      <td><button class="excl-btn" title="${exclTitle}" onclick="event.stopPropagation();toggleExclude(${i})">${exclIcon}</button></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('shot-tbody').innerHTML = html;
+}
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+let currentTab = 'sessions';
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.getElementById('tab-sessions').classList.toggle('active', tab === 'sessions');
+  document.getElementById('tab-diagnostics').classList.toggle('active', tab === 'diagnostics');
+  document.getElementById('app').style.display = tab === 'sessions' ? 'flex' : 'none';
+  document.getElementById('diag-page').style.display = tab === 'diagnostics' ? 'flex' : 'none';
+  if (tab === 'diagnostics') setTimeout(renderDiagnostics, 50);
+}
+
+let diagTarget = null;
+
+function renderDiagnostics() {
+  const page = document.getElementById('diag-page');
+
+  if (!Object.keys(shotData).length) {
+    page.innerHTML = '<div style="color:var(--muted);text-align:center;padding:60px 20px;font-size:14px">Load a backup file first.</div>';
+    return;
+  }
+
+  // Get all target labels from parsed session data
+  const labelSet = new Set();
+  Object.values(shotData).forEach(d => { if (d.label) labelSet.add(d.label); });
+  const labels = Array.from(labelSet).sort();
+  if (!diagTarget || !labels.includes(diagTarget)) diagTarget = labels[0];
+
+  // Get sessions and shots for selected target
+  const sessions = Object.entries(shotData)
+    .filter(([,d]) => d.label === diagTarget)
+    .map(([id,d]) => ({ id, data:d, ts:parseInt(id) }))
+    .sort((a,b) => a.ts - b.ts);
+
+  const allShots = sessions.flatMap(s => s.data.shots || []);
+  const shots = allShots.filter(s => s.t && s.t.length === 8);
+
+  const CRIT = [4,7];
+  const SNAMES = ['FL-BL','FL-TL','FL-TR','FL-BR','BK-BL','BK-TL','BK-TR','BK-BR'];
+  const SLONG  = ['Front Bottom-Left','Front Top-Left','Front Top-Right','Front Bottom-Right',
+                  'Back Bottom-Left','Back Top-Left','Back Top-Right','Back Bottom-Right'];
+
+  const dropoutShots  = shots.filter(s => s.t.some(v=>v===-1)).length;
+  const criticalShots = shots.filter(s => CRIT.some(i=>s.t[i]===-1)).length;
+
+  // ── Data summary table (all targets) ──
+  const summaryTableHTML = (() => {
+    const allLabels = Object.keys(shotData).reduce((s, id) => {
+      const l = shotData[id].label; if (l) s.add(l); return s;
+    }, new Set());
+    const sorted = Array.from(allLabels).sort();
+
+    const rows = sorted.map(lbl => {
+      const lblSessions = Object.entries(shotData).filter(([,d]) => d.label === lbl);
+      const nSessions = lblSessions.length;
+      const shots    = lblSessions.flatMap(([,d]) => (d.shots||[]).filter(s => !String(s.display_text||'').startsWith('S')));
+      const sighters = lblSessions.flatMap(([,d]) => (d.shots||[]).filter(s =>  String(s.display_text||'').startsWith('S')));
+      const shooters = new Set(lblSessions.map(([,d]) => d.name).filter(Boolean));
+      const dists    = new Set(lblSessions.map(([,d]) => d.dist ? `${d.dist}${d.dist_unit||''}` : null).filter(Boolean));
+      const tsList   = lblSessions.flatMap(([,d]) => (d.shots||[]).map(s => s.ts||0)).filter(t => t > 0);
+      const dateFirst = tsList.length ? new Date(Math.min(...tsList)).toLocaleDateString('en-AU',{day:'2-digit',month:'short',year:'2-digit'}) : '—';
+      const dateLast  = tsList.length ? new Date(Math.max(...tsList)).toLocaleDateString('en-AU',{day:'2-digit',month:'short',year:'2-digit'}) : '—';
+      const isSelected = lbl === diagTarget;
+      return `<tr style="border-top:1px solid var(--border);${isSelected?'background:rgba(91,141,238,0.08)':''}">
+        <td style="padding:5px 8px;font-weight:700;color:${isSelected?'var(--accent2)':'var(--text)'}">${lbl}</td>
+        <td style="text-align:center;padding:5px 4px">${nSessions}</td>
+        <td style="text-align:center;padding:5px 4px;color:var(--accent2)">${shots.length}</td>
+        <td style="text-align:center;padding:5px 4px;color:var(--muted)">${sighters.length}</td>
+        <td style="text-align:center;padding:5px 4px">${shooters.size}</td>
+        <td style="text-align:center;padding:5px 4px;font-size:10px;color:var(--muted)">${Array.from(dists).sort().join(', ')||'—'}</td>
+        <td style="text-align:center;padding:5px 4px;font-size:10px;color:var(--muted);white-space:nowrap">${dateFirst}</td>
+        <td style="text-align:center;padding:5px 4px;font-size:10px;color:var(--muted);white-space:nowrap">${dateLast}</td>
+      </tr>`;
+    }).join('');
+
+    return `<div style="width:100%;max-width:660px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;box-sizing:border-box;overflow-x:auto">
+      <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Backup Data Summary</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:420px">
+        <tr style="color:var(--muted);font-size:10px">
+          <th style="text-align:left;padding:3px 8px">Target</th>
+          <th style="text-align:center;padding:3px 4px">Sessions</th>
+          <th style="text-align:center;padding:3px 4px">Shots</th>
+          <th style="text-align:center;padding:3px 4px">Sighters</th>
+          <th style="text-align:center;padding:3px 4px">Shooters</th>
+          <th style="text-align:center;padding:3px 4px">Distances</th>
+          <th style="text-align:center;padding:3px 4px">First</th>
+          <th style="text-align:center;padding:3px 4px">Last</th>
+        </tr>
+        ${rows}
+      </table>
+    </div>`;
+  })();
+
+  // ── Tab buttons ──
+  const tabsHTML = labels.map(l =>
+    `<button onclick="diagTarget='${l}';renderDiagnostics()" style="
+      background:${l===diagTarget?'rgba(91,141,238,0.2)':'var(--surface2)'};
+      border:1px solid ${l===diagTarget?'var(--accent2)':'var(--border)'};
+      color:${l===diagTarget?'var(--accent2)':'var(--muted)'};
+      border-radius:14px;padding:5px 16px;font-size:13px;font-weight:600;cursor:pointer">${l}</button>`
+  ).join('');
+
+  // ── Summary stats ──
+  const statsHTML = `
+    <div style="display:flex;gap:0;flex-wrap:wrap;margin-top:10px">
+      <div style="flex:1;min-width:80px;text-align:center;padding:6px 4px">
+        <div style="font-size:22px;font-weight:700;color:var(--accent2)">${sessions.length}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Sessions</div>
+      </div>
+      <div style="flex:1;min-width:80px;text-align:center;padding:6px 4px">
+        <div style="font-size:22px;font-weight:700">${shots.length}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Total Shots</div>
+      </div>
+      <div style="flex:1;min-width:80px;text-align:center;padding:6px 4px">
+        <div style="font-size:22px;font-weight:700;color:#e8a020">${dropoutShots}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Dropout Shots</div>
+      </div>
+      <div style="flex:1;min-width:80px;text-align:center;padding:6px 4px">
+        <div style="font-size:22px;font-weight:700;color:#e03030">${criticalShots}</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Critical Dropouts</div>
+      </div>
+    </div>`;
+
+  // ── Sensor dropout bars ──
+  const maxRate = Math.max(...[0,1,2,3,4,5,6,7].map(i => shots.filter(s=>s.t[i]===-1).length / Math.max(shots.length,1))) || 0.01;
+  let sensorBarsHTML = '';
+  for (let i = 0; i < 8; i++) {
+    const d = shots.filter(s => s.t[i] === -1).length;
+    const rate = shots.length ? d / shots.length : 0;
+    const pct = (rate*100).toFixed(1);
+    const col = i < 4 ? (d > 0 ? '#e03030' : '#4caf50')
+              : CRIT.includes(i) ? (rate > 0.15 ? '#e03030' : rate > 0.05 ? '#e8a020' : '#4caf50')
+              : (rate > 0.15 ? '#e8a020' : '#4caf50');
+    const barW = (rate / maxRate * 100).toFixed(1);
+    sensorBarsHTML += `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <div style="font-size:11px;color:var(--muted);width:70px;flex-shrink:0;text-align:right">S${i} ${i<4?'Front':'Back'}</div>
+        <div style="flex:1;background:var(--surface2);border-radius:4px;height:22px;overflow:hidden;position:relative">
+          <div style="height:100%;width:${barW}%;background:${col};border-radius:4px;min-width:${d>0?3:0}px"></div>
+          <div style="position:absolute;left:6px;top:50%;transform:translateY(-50%);font-size:10px;color:rgba(255,255,255,0.6);pointer-events:none">${SLONG[i]}${CRIT.includes(i)?' ⚠':''}</div>
+        </div>
+        <div style="font-size:12px;font-weight:700;color:${col};width:50px;flex-shrink:0">${pct}% <span style="font-size:9px;color:var(--muted)">${d}</span></div>
+      </div>`;
+  }
+
+  // ── Critical vs non-critical ──
+  const all8    = shots.filter(s => s.t.every(v=>v!==-1)).length;
+  const nonCrit = shots.filter(s => !s.t.every(v=>v!==-1) && !CRIT.some(i=>s.t[i]===-1)).length;
+  const critical = shots.filter(s => CRIT.some(i=>s.t[i]===-1)).length;
+  const total = Math.max(shots.length, 1);
+  const critBarsHTML = [
+    { label:'All 8 sensors active',  val:all8,    col:'#4caf50', desc:'Ideal — full solution' },
+    { label:'Non-critical dropout',   val:nonCrit, col:'#e8a020', desc:'S5 or S6 missing — minor impact' },
+    { label:'Critical dropout',       val:critical, col:'#e03030', desc:'S4 or S7 missing — X position may shift up to 15mm' },
+  ].map(b => `
+    <div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+        <span style="font-size:12px;color:${b.col};font-weight:600">${b.label}</span>
+        <span style="font-size:12px;font-weight:700;color:${b.col}">${b.val} (${(b.val/total*100).toFixed(0)}%)</span>
+      </div>
+      <div style="background:var(--surface2);border-radius:4px;height:16px;overflow:hidden">
+        <div style="height:100%;width:${(b.val/total*100).toFixed(1)}%;background:${b.col};border-radius:4px"></div>
+      </div>
+      <div style="font-size:10px;color:var(--muted);margin-top:2px">${b.desc}</div>
+    </div>`).join('');
+
+  // ── Dropout pattern per session (which sensors, not just rate) ──
+  const SSHORT = ['FL-BL','FL-TL','FL-TR','FL-BR','BK-BL','BK-TL','BK-TR','BK-BR'];
+  // ── Calibration summary ──
+  const calHTML = (() => {
+    if (!sessions.length) return '<div style="color:var(--muted);font-size:12px">No data</div>';
+    const calVals = sessions.map(({data,ts}) => ({ cx: data.cal_x||0, cy: data.cal_y||0, ts }));
+    const current = calVals[calVals.length - 1];
+    const changes = calVals.filter((v,i) => i > 0 && (v.cx !== calVals[i-1].cx || v.cy !== calVals[i-1].cy));
+    const changeNote = changes.length === 0
+      ? `<span style="color:#4caf50">✓ No changes</span> — calibration has been <strong>${current.cx}mm L/R, ${current.cy}mm U/D</strong> across all ${sessions.length} sessions.`
+      : `<span style="color:#e8a020">⚠ ${changes.length} change${changes.length>1?'s':''} detected</span> — current calibration is <strong>${current.cx}mm L/R, ${current.cy}mm U/D</strong>. The offset was manually updated ${changes.length} time${changes.length>1?'s':''} across ${sessions.length} sessions.`;
+    return `
+      <div style="display:flex;gap:0;flex-wrap:wrap;margin-bottom:10px">
+        <div style="flex:1;min-width:100px;text-align:center;padding:6px 4px">
+          <div style="font-size:26px;font-weight:700;color:var(--accent2)">${current.cx}mm</div>
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">cal_x — Left / Right</div>
+        </div>
+        <div style="flex:1;min-width:100px;text-align:center;padding:6px 4px">
+          <div style="font-size:26px;font-weight:700;color:#e03030">${current.cy}mm</div>
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">cal_y — Up / Down</div>
+        </div>
+      </div>
+      <div style="padding:8px 10px;background:var(--surface2);border-radius:6px;font-size:12px;color:var(--muted);line-height:1.5">${changeNote}</div>`;
+  })();
+
+  // ── err_xy histogram ──
+  const errVals = shots.map(s => s.err_xy || 0);
+  const errBuckets = [{min:0,max:0.05,label:'0.00–0.05'},{min:0.05,max:0.10,label:'0.05–0.10'},
+    {min:0.10,max:0.15,label:'0.10–0.15'},{min:0.15,max:0.20,label:'0.15–0.20'},
+    {min:0.20,max:0.25,label:'0.20–0.25'},{min:0.25,max:999,label:'≥0.25'}];
+  const errCounts = errBuckets.map(b => errVals.filter(v=>v>=b.min&&v<b.max).length);
+  const maxErr = Math.max(...errCounts, 1);
+  const errHTML = errBuckets.map((b,i) => {
+    const col = b.min>=0.20?'#e03030':b.min>=0.10?'#e8a020':'#4caf50';
+    const pct = errVals.length ? (errCounts[i]/errVals.length*100).toFixed(0) : 0;
+    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <div style="font-size:11px;color:var(--muted);width:74px;flex-shrink:0;text-align:right">${b.label}</div>
+      <div style="flex:1;background:var(--surface2);border-radius:4px;height:16px;overflow:hidden">
+        <div style="height:100%;width:${(errCounts[i]/maxErr*100).toFixed(1)}%;background:${col};border-radius:4px"></div>
+      </div>
+      <div style="font-size:11px;font-weight:600;color:${col};width:70px;flex-shrink:0">${errCounts[i]} (${pct}%)</div>
+    </div>`;
+  }).join('');
+
+  // ── Velocity comparison — all sessions with Garmin data ──
+  const allSessionsWithGarmin = Object.entries(shotData)
+    .map(([id, data]) => ({ id, data, ts: parseInt(id) }))
+    .filter(({id}) => garminData[id]?.some(Boolean))
+    .sort((a,b) => a.ts - b.ts);
+
+  const velHTML = allSessionsWithGarmin.length ? `
+    <table style="width:100%;font-size:12px;border-collapse:collapse">
+      <tr style="color:var(--muted);font-size:10px">
+        <th style="text-align:left;padding:4px 0">Session</th>
+        <th style="text-align:center">Target</th>
+        <th style="text-align:center">Dist</th>
+        <th style="text-align:center">Garmin<br>avg / SD</th>
+        <th style="text-align:center">SM acoustic<br>avg / SD</th>
+        <th style="text-align:center">Difference</th>
+      </tr>
+      ${allSessionsWithGarmin.map(({id,data,ts}) => {
+        const gv = garminData[id].filter(Boolean).map(g=>g.fps);
+        const ga = gv.reduce((a,b)=>a+b,0)/gv.length;
+        const gsd = Math.sqrt(gv.map(v=>(v-ga)**2).reduce((a,b)=>a+b,0)/gv.length);
+        const sv = (data.shots||[]).filter(s=>s.v>0&&!String(s.display_text||'').startsWith('S')).map(s=>s.v*FPS_CONV);
+        const sa = sv.length ? sv.reduce((a,b)=>a+b,0)/sv.length : null;
+        const ssd = sa ? Math.sqrt(sv.map(v=>(v-sa)**2).reduce((a,b)=>a+b,0)/sv.length) : null;
+        const diff = sa ? sa-ga : null;
+        const dc = diff===null?'var(--muted)':Math.abs(diff)<5?'#4caf50':Math.abs(diff)<15?'#e8a020':'#e03030';
+        const ds = new Date(ts).toLocaleDateString('en-AU',{day:'2-digit',month:'short',year:'2-digit'});
+        const dist = data.dist ? `${data.dist}${data.dist_unit||''}` : '—';
+        const lbl = data.label||'?';
+        return `<tr style="border-top:1px solid var(--border)">
+          <td style="padding:5px 0;color:var(--muted)">${ds} <span style="color:var(--muted);font-size:10px">${data.name||''}</span></td>
+          <td style="text-align:center;color:var(--accent2);font-weight:600">${lbl}</td>
+          <td style="text-align:center;color:var(--muted)">${dist}</td>
+          <td style="text-align:center;color:var(--accent2)">${Math.round(ga)} <span style="font-size:10px;color:var(--muted)">SD ${gsd.toFixed(1)}</span></td>
+          <td style="text-align:center">${sa ? `${Math.round(sa)} <span style="font-size:10px;color:var(--muted)">SD ${ssd.toFixed(1)}</span>` : 'N/A'}</td>
+          <td style="text-align:center;color:${dc};font-weight:600">${diff!==null?(diff>=0?'+':'')+diff.toFixed(1)+' fps':'N/A'}</td>
+        </tr>`;
+      }).join('')}
+    </table>` :
+    '<div style="color:var(--muted);font-size:12px">No Garmin data imported yet. Import a Garmin CSV on the Sessions page to see the comparison.</div>';
+
+  function card(icon, title, explain, content) {
+    return `<div style="width:100%;max-width:660px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;box-sizing:border-box">
+      <div style="font-size:14px;font-weight:700;margin-bottom:6px">${icon} ${title}</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:12px;padding:8px 10px;background:var(--surface2);border-radius:6px;border-left:3px solid var(--accent2)">${explain}</div>
+      ${content}
+    </div>`;
+  }
+
+  page.innerHTML = `
+    ${summaryTableHTML}
+    ${card('🎯','Select Target Unit',
+      'Choose which Shotmarker target unit to analyse. Each unit has its own sensor characteristics and history.',
+      `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">${tabsHTML}</div>${statsHTML}`)}
+    ${card('📡','Sensor Dropout Rate',
+      'Each shot should trigger all 8 sensors. A dropout means a sensor missed the acoustic shockwave. Front sensors (S0–S3) should never drop out. Back bottom sensors (S4, S7) ⚠ are critical — dropouts degrade left/right accuracy by up to 15mm.',
+      sensorBarsHTML)}
+    ${card('⚠️','Critical vs Non-Critical Dropouts',
+      'Critical dropouts (S4 or S7 missing) degrade the left/right position solution. Non-critical dropouts (S5 or S6) have minor impact.',
+      critBarsHTML)}
+    ${card('📐','Calibration Offset History',
+      'The cal_x/cal_y offset corrects sensor-to-target alignment. Large sudden changes suggest the unit was moved or knocked. Gradual drift may indicate the frame is shifting.',
+      calHTML)}
+    ${card('💨','Acoustic vs Garmin Velocity',
+      'Compares Shotmarker acoustic velocity estimates against Garmin Xero readings. Only shown when Garmin data has been imported for sessions on this target.',
+      velHTML)}
+    ${card('📊','Position Error Distribution (err_xy)',
+      'Shotmarker\'s internal position residual. Values near 0.0 are ideal. Values above 0.20 indicate the sensor timings did not agree well — Shotmarker flags these internally.',
+      errHTML)}`;
+}
+
+
+// ── Resize ────────────────────────────────────────────────────────────────────
+let rt;
+window.addEventListener('resize', () => { clearTimeout(rt); rt=setTimeout(()=>{ if(currentId) drawTarget(); },120); });
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
