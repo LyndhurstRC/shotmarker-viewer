@@ -475,6 +475,8 @@
       </div>
     </div>
 
+    <!-- Save stage button is below shot-detail -->
+
     <div id="target-wrap" style="display:none">
       <canvas id="target-canvas"></canvas>
       <div id="zoom-controls">
@@ -491,7 +493,6 @@
         <div class="theme-btn" onclick="setTheme('green',this)" title="Night Vision" style="color:#00bb55">⬤</div>
         <div class="theme-btn" onclick="setTheme('steel',this)" title="Blue Steel" style="color:#4488bb">⬤</div>
       </div>
-
     </div>
 
     <div id="shot-detail">
@@ -502,21 +503,26 @@
       <div class="sd-dismiss" onclick="clearHighlight()">✕</div>
     </div>
 
+    <div id="save-stage-wrap" style="display:none;width:100%;max-width:660px;justify-content:flex-end">
+      <button onclick="saveStageImage()" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px">💾 Save Stage Image</button>
+    </div>
+
     <div id="shot-table-wrap" style="display:none">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
         <h3 style="margin:0">Shot log — tap row to highlight on target</h3>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span id="garmin-status" style="font-size:12px;color:var(--muted)"></span>
-          <label id="garmin-btn" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:5px 11px;font-size:12px;cursor:pointer;white-space:nowrap" title="Import Garmin Xero CSV to add fps data">📥 Import Garmin
-            <input type="file" id="garmin-input" accept=".csv" style="display:none">
-          </label>
-        </div>
+        <label id="garmin-btn" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:5px 11px;font-size:12px;cursor:pointer;white-space:nowrap">📥 Import Garmin CSV
+          <input type="file" id="garmin-input" accept=".csv" style="display:none">
+        </label>
       </div>
+      <div id="garmin-library" style="display:none;margin-bottom:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px">
+        <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Garmin Library — select a file to apply to this session</div>
+        <div id="garmin-library-list"></div>
+      </div>
+      <div id="garmin-applied" style="font-size:12px;color:var(--muted);margin-bottom:6px;min-height:18px"></div>
       <table id="shot-table">
         <thead><tr><th>#</th><th>Score</th><th>Interval</th><th>fps</th><th>X mm</th><th>Y mm</th><th>θ°</th><th></th></tr></thead>
         <tbody id="shot-tbody"></tbody>
       </table>
-
     </div>
   </div>
 </div>
@@ -532,6 +538,7 @@ let currentId = null, selectedShot = null;
 let allDistances = new Set(), activeDistFilter = null;
 let garminData = {};  // keyed by session id, value = array of {shotNum, fps, time}
 let excludedShots = {};  // keyed by session id, value = Set of shot indices
+let garminLibrary = []; // all imported Garmin CSVs: [{id, filename, sessionDate, shots, bulletWeight, shotCount}]
 
 // Zoom / pan
 let zoom = 1, panX = 0, panY = 0;
@@ -703,14 +710,22 @@ function openSession(id) {
   document.getElementById('session-info').style.display = '';
   document.getElementById('score-strip').style.display = '';
   document.getElementById('target-wrap').style.display = '';
+  document.getElementById('save-stage-wrap').style.display = 'flex';
   document.getElementById('shot-table-wrap').style.display = '';
   document.getElementById('shot-detail').style.display = 'none';
 
-  // Restore garmin status if previously imported for this session
-  const gStatus = garminData[id]
-    ? `✓ Garmin: ${garminData[id].filter(Boolean).length} shots`
-    : '';
-  document.getElementById('garmin-status').textContent = gStatus;
+  // Restore garmin applied status if previously imported for this session
+  const appliedEntry = garminLibrary.find(g => g.id === garminData[currentId]?._libraryId);
+  const appliedEl = document.getElementById('garmin-applied');
+  if (appliedEl) {
+    if (appliedEntry) {
+      const count = garminData[currentId].filter(m => m !== null).length;
+      appliedEl.textContent = `✓ ${appliedEntry.filename} applied — ${count}/${currentShots.length} shots matched`;
+    } else {
+      appliedEl.textContent = '';
+    }
+  }
+  renderGarminLibrary();
 
   renderInfo();
   renderScoreStrip();
@@ -1183,47 +1198,271 @@ function dot(ctx, x, y, r, fill, stroke, lbl, fs, lc) {
 }
 
 // ── Save image ────────────────────────────────────────────────────────────────
+function saveStageImage() {
+  if (!currentMeta) return;
+  const meta = currentMeta;
+  const shots = activeShots();
+  const data  = shotData[currentId];
+  const dpr   = window.devicePixelRatio || 1;
+  const W     = 900; // fixed output width in logical px
+  const PAD   = 24;
+  const COL   = '#f2f2f7';
+  const MUTED = '#8e8e93';
+  const BG    = '#1c1c1e';
+  const SURF  = '#2c2c2e';
+  const SURF2 = '#3a3a3c';
+  const AMBER = '#e8a020';
+  const BLUE  = '#5b8dee';
+  const GREEN = '#4caf50';
+
+  // ── Build rows for shot log ──
+  const hasGarmin = garminData[currentId]?.some(Boolean);
+  const shotRows  = currentShots.map((s,i) => {
+    const excl  = isExcluded(i);
+    const sc    = String(s.score ?? '?');
+    const lbl   = s.display_text != null ? String(s.display_text) : String(i+1);
+    const fps   = resolvedFps(s, i);
+    const src   = resolvedFpsSource(s, i);
+    const theta = s.theta != null ? (s.theta*180/Math.PI).toFixed(2)+'°' : '-';
+    const allOrdered = [...currentSighters, ...currentShots];
+    const prev  = allOrdered[currentSighters.length + i - 1];
+    const intv  = (prev?.ts && s.ts) ? formatInterval(s.ts - prev.ts) : '-';
+    return { lbl, sc, fps, src, intv, theta, excl, x: s.x, y: s.y };
+  });
+
+  // ── Measure height needed ──
+  const TARGET_SIZE   = W - PAD*2;
+  const HEADER_H      = 140;
+  const STATS_H       = 70;
+  const GARMIN_H      = hasGarmin ? 80 : 0;
+  const STRIP_H       = 56;
+  const TABLE_ROW_H   = 22;
+  const TABLE_ROWS    = currentSighters.length + currentShots.length;
+  const TABLE_H       = TABLE_ROWS * TABLE_ROW_H + 28;
+  const TOTAL_H       = HEADER_H + STATS_H + GARMIN_H + STRIP_H + TARGET_SIZE + TABLE_H + PAD*4;
+
+  const out = document.createElement('canvas');
+  out.width  = W * dpr;
+  out.height = TOTAL_H * dpr;
+  const ctx  = out.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  ctx.fillStyle = BG;
+  ctx.fillRect(0, 0, W, TOTAL_H);
+
+  let y = PAD;
+
+  // ── Header ──
+  ctx.fillStyle = COL;
+  ctx.font = 'bold 28px -apple-system,sans-serif';
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ctx.fillText(meta.name || 'Unnamed', PAD, y);
+
+  // Score total top-right
+  let numeric = 0, xCount = 0, vCount = 0;
+  currentShots.forEach(s => {
+    const sc = String(s.score??'');
+    if (sc==='X'){numeric+=6;xCount++;}
+    else if(sc==='V'){numeric+=5;vCount++;}
+    else numeric+=parseInt(sc)||0;
+  });
+  let totalStr = String(numeric);
+  if (xCount>0) totalStr+=`-${xCount}X`;
+  else if (vCount>0) totalStr+=`-${vCount}V`;
+  ctx.fillStyle = AMBER;
+  ctx.font = 'bold 38px -apple-system,sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText(totalStr, W-PAD, y);
+
+  y += 36;
+  ctx.fillStyle = MUTED;
+  ctx.font = '14px -apple-system,sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText(`${meta.target_name}  ·  ${meta.dist}  ·  ${meta.dateStr} ${meta.time}`, PAD, y);
+  y += 20;
+
+  // Velocity stats
+  const vels = shots.map((s,i)=>{ const g=getGarminFps(i); return g||( s.v>0?s.v*FPS_CONV:null); }).filter(Boolean);
+  if (vels.length>1) {
+    const avg=vels.reduce((a,b)=>a+b,0)/vels.length;
+    const sd=Math.sqrt(vels.map(v=>(v-avg)**2).reduce((a,b)=>a+b,0)/vels.length);
+    const es=Math.max(...vels)-Math.min(...vels);
+    const src = hasGarmin ? ' (Garmin)' : ' (acoustic)';
+    ctx.fillStyle = BLUE;
+    ctx.font = '13px -apple-system,sans-serif';
+    ctx.fillText(`avg ${Math.round(avg)} fps  SD ${sd.toFixed(1)}  ES ${Math.round(es)}${src}`, PAD, y);
+    y += 18;
+  }
+
+  // MOA
+  if (shots.length>=2 && data?.dist) {
+    const distMm = distToMm(data.dist, data.dist_unit||'m');
+    const moa = calcGroupMOA(shots, distMm);
+    if (moa) {
+      ctx.fillStyle = '#c080e0';
+      ctx.font = '13px -apple-system,sans-serif';
+      ctx.fillText(`Group ${moa.toFixed(2)} MOA`, PAD, y);
+      y += 18;
+    }
+  }
+
+  // Watermark
+  ctx.fillStyle = 'rgba(232,160,32,0.4)';
+  ctx.font = '11px -apple-system,sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText('Lyndhurst Rifle Club 2026 — JG', W-PAD, PAD+4);
+
+  y = HEADER_H;
+
+  // ── Score strip ──
+  ctx.fillStyle = SURF;
+  ctx.fillRect(PAD, y, W-PAD*2, STRIP_H);
+  const cellW = Math.min(36, (W-PAD*2-8) / Math.max(currentShots.length + currentSighters.length, 1) - 3);
+  const cellH = 30;
+  let sx = PAD + 4;
+  const stripY = y + (STRIP_H-cellH)/2;
+  [...currentSighters.map((s,i)=>({s,isSighter:true,i})), ...currentShots.map((s,i)=>({s,isSighter:false,i}))].forEach(({s,isSighter,i}) => {
+    ctx.fillStyle = isSighter ? SURF2 : (i===selectedShot?AMBER:SURF2);
+    roundRect(ctx, sx, stripY, cellW, cellH, 4); ctx.fill();
+    const lbl = isSighter ? `S${i+1}` : (s.display_text!=null?String(s.display_text):String(i+1));
+    const sc  = isSighter ? '—' : String(s.score??'?');
+    ctx.fillStyle = isSighter ? MUTED : (i===selectedShot?'#000':MUTED);
+    ctx.font = `${Math.max(7,cellW*0.35)}px -apple-system,sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillText(lbl, sx+cellW/2, stripY+2);
+    ctx.fillStyle = isSighter ? MUTED : (i===selectedShot?'#000':COL);
+    ctx.font = `bold ${Math.max(8,cellW*0.45)}px -apple-system,sans-serif`;
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(sc, sx+cellW/2, stripY+cellH-2);
+    sx += cellW + 3;
+  });
+  y += STRIP_H + 8;
+
+  // ── Target plot ──
+  const targetCanvas = document.getElementById('target-canvas');
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(PAD, y, TARGET_SIZE, TARGET_SIZE);
+  ctx.clip();
+  ctx.drawImage(targetCanvas, PAD, y, TARGET_SIZE, TARGET_SIZE);
+  ctx.restore();
+  y += TARGET_SIZE + 12;
+
+  // ── Shot log table ──
+  const tableCols = [
+    {label:'#',    w:30,  align:'center'},
+    {label:'Score',w:44,  align:'center'},
+    {label:'fps',  w:hasGarmin?58:50, align:'center'},
+    {label:'Intv', w:44,  align:'center'},
+    {label:'X mm', w:50,  align:'right'},
+    {label:'Y mm', w:50,  align:'right'},
+    {label:'θ°',   w:46,  align:'right'},
+  ];
+  const tableW = W-PAD*2;
+  const totalColW = tableCols.reduce((a,c)=>a+c.w,0);
+  const flex = tableW - totalColW;
+
+  // Header row
+  ctx.fillStyle = SURF2;
+  ctx.fillRect(PAD, y, tableW, 24);
+  let cx = PAD + 4;
+  tableCols.forEach(c => {
+    ctx.fillStyle = MUTED;
+    ctx.font = 'bold 9px -apple-system,sans-serif';
+    ctx.textAlign = c.align; ctx.textBaseline = 'middle';
+    ctx.fillText(c.label.toUpperCase(), cx + (c.align==='right'?c.w:c.align==='center'?c.w/2:0), y+12);
+    cx += c.w;
+  });
+  y += 24;
+
+  // Data rows
+  const allTableRows = [
+    ...currentSighters.map((s,i) => ({s, isSighter:true, idx:i})),
+    ...currentShots.map((s,i) => ({s, isSighter:false, idx:i}))
+  ];
+
+  allTableRows.forEach(({s, isSighter, idx}, rowIdx) => {
+    const rowY = y + rowIdx * TABLE_ROW_H;
+    if (rowIdx % 2 === 0) { ctx.fillStyle = 'rgba(255,255,255,0.02)'; ctx.fillRect(PAD, rowY, tableW, TABLE_ROW_H); }
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(PAD, rowY); ctx.lineTo(W-PAD, rowY); ctx.stroke();
+
+    const excl = !isSighter && isExcluded(idx);
+    ctx.globalAlpha = excl ? 0.3 : 1;
+
+    const lbl   = isSighter ? `S${idx+1}` : (s.display_text!=null?String(s.display_text):String(idx+1));
+    const sc    = isSighter ? '—' : String(s.score??'?');
+    const fps   = isSighter ? (garminData[currentId]?._sighterFps?.[idx] ? Math.round(garminData[currentId]._sighterFps[idx]) : (s.v>0?Math.round(s.v*FPS_CONV):'-')) : resolvedFps(s,idx);
+    const fpsIsGarmin = !isSighter && resolvedFpsSource(s,idx)==='garmin';
+    const theta = s.theta!=null?(s.theta*180/Math.PI).toFixed(1)+'°':'-';
+    const allOrd = [...currentSighters,...currentShots];
+    const prevS  = allOrd[currentSighters.length+(isSighter?idx-1:currentSighters.length+idx-1)];
+    const intv  = (prevS?.ts&&s.ts) ? formatInterval(s.ts-prevS.ts) : '-';
+
+    const vals = [lbl, sc, fps?String(fps):'-', intv, s.x!=null?s.x.toFixed(1):'-', s.y!=null?s.y.toFixed(1):'-', theta];
+    const colors = [MUTED, isSighter?MUTED:COL, fpsIsGarmin?GREEN:(isSighter?MUTED:COL), MUTED, MUTED, MUTED, MUTED];
+
+    cx = PAD + 4;
+    tableCols.forEach((c,ci) => {
+      ctx.fillStyle = colors[ci];
+      ctx.font = `${ci===1?'bold ':''  }11px -apple-system,sans-serif`;
+      ctx.textAlign = c.align; ctx.textBaseline = 'middle';
+      ctx.fillText(vals[ci], cx+(c.align==='right'?c.w:c.align==='center'?c.w/2:0), rowY+TABLE_ROW_H/2);
+      cx += c.w;
+    });
+    ctx.globalAlpha = 1;
+  });
+
+  // ── Trigger download with save dialog ──
+  const fname = `${(meta.name||'session').replace(/\s+/g,'-')}_${meta.target_name}_${meta.dateStr.replace(/\s+/g,'-')}.png`;
+  out.toBlob(blob => {
+    // Use File System Access API if available (shows save dialog with location choice)
+    if (window.showSaveFilePicker) {
+      window.showSaveFilePicker({
+        suggestedName: fname,
+        types: [{ description: 'PNG Image', accept: {'image/png': ['.png']} }]
+      }).then(handle => handle.createWritable()).then(writable => {
+        writable.write(blob); return writable.close();
+      }).then(() => showToast('Image saved')).catch(e => { if (e.name!=='AbortError') showToast('Save failed'); });
+    } else {
+      // Fallback: standard download
+      const link = document.createElement('a');
+      link.download = fname;
+      link.href = URL.createObjectURL(blob);
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(link.href), 5000);
+      showToast('Image downloaded');
+    }
+  }, 'image/png');
+}
+
 function saveImage() {
   if (!currentMeta) return;
   const meta = currentMeta;
   const shots = currentShots;
-
-  // Get the target canvas
   const targetCanvas = document.getElementById('target-canvas');
   const cw = targetCanvas.width;
   const ch = targetCanvas.height;
   const dpr = window.devicePixelRatio || 1;
   const dispW = cw / dpr;
-
-  // Create composite canvas: header info + target plot
   const PAD = Math.round(dispW * 0.04);
   const HEADER_H = Math.round(dispW * 0.22);
   const out = document.createElement('canvas');
   out.width  = cw;
   out.height = ch + HEADER_H * dpr;
   const ctx = out.getContext('2d');
-
-  // Background
   ctx.fillStyle = '#1c1c1e';
   ctx.fillRect(0, 0, out.width, out.height);
-
-  // ── Header section ──
   ctx.save();
   ctx.scale(dpr, dpr);
-
-  // Session name
   ctx.fillStyle = '#f2f2f7';
   ctx.font = `bold ${Math.round(dispW * 0.055)}px -apple-system, sans-serif`;
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
   ctx.fillText(meta.name || 'Unnamed', PAD, PAD);
-
-  // Target info line
   ctx.fillStyle = '#8e8e93';
   ctx.font = `${Math.round(dispW * 0.034)}px -apple-system, sans-serif`;
   ctx.fillText(`${meta.target_name}  ·  ${meta.dist}  ·  ${meta.dateStr} ${meta.time}`, PAD, PAD + Math.round(dispW * 0.065));
-
-  // Score total
   let numeric = 0, xCount = 0, vCount = 0;
   shots.forEach(s => {
     const sc = String(s.score ?? '');
@@ -1234,19 +1473,11 @@ function saveImage() {
   let totalStr = String(numeric);
   if (xCount > 0) totalStr += `-${xCount}X`;
   else if (vCount > 0) totalStr += `-${vCount}V`;
-
   ctx.fillStyle = '#e8a020';
   ctx.font = `bold ${Math.round(dispW * 0.075)}px -apple-system, sans-serif`;
   ctx.textAlign = 'right';
   ctx.fillText(totalStr, dispW - PAD, PAD);
-
-  // Velocity stats — Garmin priority, Shotmarker v in m/s
-  const vels = shots.map((s,i) => {
-    const g = getGarminFps(i);
-    if (g) return g;
-    if (s.v && s.v > 0) return s.v * FPS_CONV;
-    return null;
-  }).filter(Boolean);
+  const vels = shots.map((s,i) => { const g = getGarminFps(i); if (g) return g; if (s.v && s.v > 0) return s.v * FPS_CONV; return null; }).filter(Boolean);
   if (vels.length > 1) {
     const avg = vels.reduce((a,b)=>a+b,0)/vels.length;
     const sd = Math.sqrt(vels.map(v=>(v-avg)**2).reduce((a,b)=>a+b,0)/vels.length);
@@ -1254,8 +1485,6 @@ function saveImage() {
     ctx.font = `${Math.round(dispW * 0.034)}px -apple-system, sans-serif`;
     ctx.fillText(`avg ${Math.round(avg)} fps  SD ${sd.toFixed(1)}`, dispW - PAD, PAD + Math.round(dispW * 0.065));
   }
-
-  // Score sequence
   const seqY = PAD + Math.round(dispW * 0.13);
   const cellW = Math.round(dispW * 0.042);
   const cellH = Math.round(dispW * 0.050);
@@ -1263,38 +1492,25 @@ function saveImage() {
   shots.forEach((s, i) => {
     const lbl = s.display_text != null ? String(s.display_text) : String(i+1);
     const sc  = String(s.score ?? '?');
-    // Cell background
     ctx.fillStyle = i === selectedShot ? '#e8a020' : '#3a3a3c';
-    roundRect(ctx, sx, seqY, cellW, cellH, 3);
-    ctx.fill();
-    // Number above
+    roundRect(ctx, sx, seqY, cellW, cellH, 3); ctx.fill();
     ctx.fillStyle = i === selectedShot ? '#000' : '#8e8e93';
     ctx.font = `${Math.round(cellW * 0.38)}px -apple-system, sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     ctx.fillText(lbl, sx + cellW/2, seqY + 2);
-    // Score
     ctx.fillStyle = i === selectedShot ? '#000' : '#f2f2f7';
     ctx.font = `bold ${Math.round(cellW * 0.52)}px -apple-system, sans-serif`;
     ctx.textBaseline = 'bottom';
     ctx.fillText(sc, sx + cellW/2, seqY + cellH - 2);
     sx += cellW + 3;
-    if (sx + cellW > dispW - PAD) { sx = PAD; }
+    if (sx + cellW > dispW - PAD) sx = PAD;
   });
-
-  // Club watermark
   ctx.fillStyle = 'rgba(232,160,32,0.5)';
   ctx.font = `${Math.round(dispW * 0.028)}px -apple-system, sans-serif`;
-  ctx.textAlign = 'right';
-  ctx.textBaseline = 'bottom';
+  ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
   ctx.fillText('Lyndhurst Rifle Club 2026 — JG', dispW - PAD, HEADER_H - 6);
-
   ctx.restore();
-
-  // ── Draw target plot below header ──
   ctx.drawImage(targetCanvas, 0, HEADER_H * dpr);
-
-  // ── Download ──
   const fname = `${(meta.name||'session').replace(/\s+/g,'-')}_${meta.dateStr.replace(/\s+/g,'-')}.png`;
   const link = document.createElement('a');
   link.download = fname;
@@ -1547,43 +1763,117 @@ function parseGarminCSV(text) {
 }
 
 function importGarmin(file) {
-  if (!currentId) return;
   const reader = new FileReader();
   reader.onload = e => {
     const { sessionDate, shots, bulletWeight } = parseGarminCSV(e.target.result);
-    if (!shots.length) {
-      showToast('No shot data found in CSV');
-      return;
+    if (!shots.length) { showToast('No shot data found in CSV'); return; }
+
+    // Add to library if not already present (match by date + shot count)
+    const dateStr = sessionDate ? sessionDate.toLocaleDateString('en-AU',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '?';
+    const existing = garminLibrary.find(g => g.dateStr === dateStr && g.shots.length === shots.length);
+    if (!existing) {
+      garminLibrary.push({
+        id: Date.now(),
+        filename: file.name,
+        dateStr,
+        sessionDate,
+        shots,
+        bulletWeight,
+        shotCount: shots.length
+      });
     }
 
-    const smShots = currentShots;
-    const matched = matchGarminShots(smShots, shots);
-
-    // Also store sighter fps — they sit at the start of the Garmin sequence
-    const rawShots = shotData[currentId]?.shots || [];
-    let sighterOffset = 0;
-    for (const s of rawShots) {
-      if (s.sighter || String(s.display_text || '').startsWith('S')) sighterOffset++;
-      else break;
-    }
-    const sighterFps = shots.slice(0, sighterOffset).map(g => g ? g.fps : null);
-
-    // Store matched shots, sighter fps and bullet weight
-    garminData[currentId] = matched;
-    garminData[currentId]._bulletWeight = bulletWeight;
-    garminData[currentId]._sighterFps = sighterFps;
-    const count = matched.filter(m => m !== null).length;
-
-    document.getElementById('garmin-status').textContent =
-      `✓ Garmin: ${count}/${smShots.length} shots matched`;
-
-    renderInfo();
-    renderScoreStrip();
-    renderTable();
-    drawTarget();
-    showToast(`Garmin data imported — ${count} shots matched`);
+    renderGarminLibrary();
+    showToast(`Garmin CSV added to library — ${shots.length} shots`);
   };
   reader.readAsText(file);
+}
+
+function renderGarminLibrary() {
+  const lib = document.getElementById('garmin-library');
+  const list = document.getElementById('garmin-library-list');
+  if (!lib || !list) return;
+
+  if (!garminLibrary.length) { lib.style.display = 'none'; return; }
+  lib.style.display = '';
+
+  const appliedId = garminData[currentId]?._libraryId || null;
+
+  list.innerHTML = garminLibrary.map(g => {
+    const isApplied = appliedId === g.id;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;margin-bottom:3px;
+        background:${isApplied?'rgba(91,141,238,0.15)':'var(--bg)'};
+        border:1px solid ${isApplied?'var(--accent2)':'transparent'}">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:600;color:${isApplied?'var(--accent2)':'var(--text)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${g.filename}</div>
+        <div style="font-size:10px;color:var(--muted)">${g.dateStr} · ${g.shotCount} shots${g.bulletWeight?` · ${g.bulletWeight}gr`:''}</div>
+      </div>
+      <button onclick="toggleGarminLibraryEntry(${g.id})" style="
+        background:${isApplied?'rgba(224,48,48,0.15)':'rgba(76,175,80,0.15)'};
+        border:1px solid ${isApplied?'#e03030':'#4caf50'};
+        color:${isApplied?'#e03030':'#4caf50'};
+        border-radius:6px;padding:3px 10px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap">
+        ${isApplied?'✕ Remove':'✓ Apply'}
+      </button>
+    </div>`;
+  }).join('');
+}
+
+function toggleGarminLibraryEntry(libId) {
+  if (!currentId) return;
+  const appliedId = garminData[currentId]?._libraryId || null;
+
+  if (appliedId === libId) {
+    // Remove — clear garmin data for this session
+    delete garminData[currentId];
+    const applied = document.getElementById('garmin-applied');
+    if (applied) applied.textContent = '';
+  } else {
+    // Apply
+    applyGarminFromLibrary(libId);
+    return; // applyGarminFromLibrary handles re-render
+  }
+
+  renderGarminLibrary();
+  renderInfo();
+  renderScoreStrip();
+  renderTable();
+  drawTarget();
+  if (currentTab === 'diagnostics') renderDiagnostics();
+}
+
+function applyGarminFromLibrary(libId) {
+  if (!currentId) return;
+  const entry = garminLibrary.find(g => g.id === libId);
+  if (!entry) return;
+
+  const smShots = currentShots;
+  const matched = matchGarminShots(smShots, entry.shots);
+
+  const rawShots = shotData[currentId]?.shots || [];
+  let sighterOffset = 0;
+  for (const s of rawShots) {
+    if (s.sighter || String(s.display_text || '').startsWith('S')) sighterOffset++;
+    else break;
+  }
+  const sighterFps = entry.shots.slice(0, sighterOffset).map(g => g ? g.fps : null);
+
+  garminData[currentId] = matched;
+  garminData[currentId]._bulletWeight = entry.bulletWeight;
+  garminData[currentId]._sighterFps = sighterFps;
+  garminData[currentId]._libraryId = libId;
+
+  const count = matched.filter(m => m !== null).length;
+  const applied = document.getElementById('garmin-applied');
+  if (applied) applied.textContent = `✓ ${entry.filename} applied — ${count}/${smShots.length} shots matched`;
+
+  renderGarminLibrary();
+  renderInfo();
+  renderScoreStrip();
+  renderTable();
+  drawTarget();
+  if (currentTab === 'diagnostics') renderDiagnostics();
+  showToast(`Garmin applied — ${count} shots matched`);
 }
 
 function matchGarminShots(smShots, garminShots) {
@@ -1653,7 +1943,7 @@ function renderTable() {
       const lbl = s.display_text != null ? String(s.display_text) : `S${i+1}`;
       let fps = '-';
       if (sighterFps[i]) {
-        fps = `${Math.round(sighterFps[i])}<span style="font-size:9px;opacity:0.45;margin-left:2px">G</span>`;
+        fps = `<span style="color:#4caf50">${Math.round(sighterFps[i])}</span><span style="font-size:9px;opacity:0.55;margin-left:2px;color:#4caf50">G</span>`;
       } else if (s.v && s.v > 0) {
         fps = String(Math.round(s.v * FPS_CONV));
       }
@@ -1679,7 +1969,7 @@ function renderTable() {
     const fps = resolvedFps(s, i);
     const src = resolvedFpsSource(s, i);
     const fpsCell = fps
-      ? `${fps}<span style="font-size:9px;opacity:0.45;margin-left:2px">${src==='garmin'?'G':''}</span>`
+      ? `<span style="${src==='garmin'?'color:#4caf50':''}">${fps}</span><span style="font-size:9px;opacity:0.55;margin-left:2px${src==='garmin'?';color:#4caf50':''}">${src==='garmin'?'G':''}</span>`
       : '-';
     const orderIdx = sighters.length + i;
     const prev = allOrdered[orderIdx - 1];
@@ -1914,18 +2204,23 @@ function renderDiagnostics() {
     </div>`;
   }).join('');
 
-  // ── Velocity comparison ──
-  const gSessions = sessions.filter(({id}) => garminData[id]?.some(Boolean));
-  const velHTML = gSessions.length ? `
+  // ── Velocity comparison — all sessions with Garmin data ──
+  const allSessionsWithGarmin = Object.entries(shotData)
+    .map(([id, data]) => ({ id, data, ts: parseInt(id) }))
+    .filter(({id}) => garminData[id]?.some(Boolean))
+    .sort((a,b) => a.ts - b.ts);
+
+  const velHTML = allSessionsWithGarmin.length ? `
     <table style="width:100%;font-size:12px;border-collapse:collapse">
       <tr style="color:var(--muted);font-size:10px">
         <th style="text-align:left;padding:4px 0">Session</th>
+        <th style="text-align:center">Target</th>
         <th style="text-align:center">Dist</th>
         <th style="text-align:center">Garmin<br>avg / SD</th>
         <th style="text-align:center">SM acoustic<br>avg / SD</th>
         <th style="text-align:center">Difference</th>
       </tr>
-      ${gSessions.map(({id,data,ts}) => {
+      ${allSessionsWithGarmin.map(({id,data,ts}) => {
         const gv = garminData[id].filter(Boolean).map(g=>g.fps);
         const ga = gv.reduce((a,b)=>a+b,0)/gv.length;
         const gsd = Math.sqrt(gv.map(v=>(v-ga)**2).reduce((a,b)=>a+b,0)/gv.length);
@@ -1936,8 +2231,10 @@ function renderDiagnostics() {
         const dc = diff===null?'var(--muted)':Math.abs(diff)<5?'#4caf50':Math.abs(diff)<15?'#e8a020':'#e03030';
         const ds = new Date(ts).toLocaleDateString('en-AU',{day:'2-digit',month:'short',year:'2-digit'});
         const dist = data.dist ? `${data.dist}${data.dist_unit||''}` : '—';
+        const lbl = data.label||'?';
         return `<tr style="border-top:1px solid var(--border)">
-          <td style="padding:5px 0;color:var(--muted)">${ds}</td>
+          <td style="padding:5px 0;color:var(--muted)">${ds} <span style="color:var(--muted);font-size:10px">${data.name||''}</span></td>
+          <td style="text-align:center;color:var(--accent2);font-weight:600">${lbl}</td>
           <td style="text-align:center;color:var(--muted)">${dist}</td>
           <td style="text-align:center;color:var(--accent2)">${Math.round(ga)} <span style="font-size:10px;color:var(--muted)">SD ${gsd.toFixed(1)}</span></td>
           <td style="text-align:center">${sa ? `${Math.round(sa)} <span style="font-size:10px;color:var(--muted)">SD ${ssd.toFixed(1)}</span>` : 'N/A'}</td>
@@ -1945,7 +2242,7 @@ function renderDiagnostics() {
         </tr>`;
       }).join('')}
     </table>` :
-    '<div style="color:var(--muted);font-size:12px">No Garmin data imported for this target yet.</div>';
+    '<div style="color:var(--muted);font-size:12px">No Garmin data imported yet. Import a Garmin CSV on the Sessions page to see the comparison.</div>';
 
   function card(icon, title, explain, content) {
     return `<div style="width:100%;max-width:660px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;box-sizing:border-box">
