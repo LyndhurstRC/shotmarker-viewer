@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<!-- saved from url=(0061)file:///C:/Users/joshg/Downloads/silvermountain-viewer_2.html -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Silver Mountain Viewer</title>
+<meta name="theme-color" content="#1c1c1e">
+<style>
+  :root {
+    --bg: #1c1c1e; --surface: #2c2c2e; --surface2: #3a3a3c;
+    --border: #444448; --text: #f2f2f7; --muted: #8e8e93;
+    --accent: #e8a020; --accent2: #5b8dee; --green: #4caf50; --purple: #c080e0;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-height: 100vh;
+  }
+
+  #header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px; border-bottom: 1px solid var(--border);
+    background: var(--surface); position: sticky; top: 0; z-index: 10;
+  }
+  #header h1 { font-size: 16px; margin: 0; font-weight: 700; }
+  #header .sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .back-btn {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 7px; color: var(--muted); padding: 5px 11px;
+    font-size: 13px; cursor: pointer; white-space: nowrap; margin-left: auto;
+  }
+  .back-btn:hover { color: var(--text); border-color: var(--muted); }
+
+  #load-screen {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: calc(100vh - 56px); padding: 40px 20px; gap: 22px; text-align: center;
+  }
+  #load-screen h2 { margin: 0; font-size: 22px; }
+  #load-screen p { color: var(--muted); margin: 0; max-width: 360px; font-size: 14px; }
+  .drop-zone {
+    border: 2px dashed var(--border); border-radius: 16px;
+    padding: 36px 28px; width: 100%; max-width: 380px;
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
+    transition: border-color .15s, background .15s;
+  }
+  .drop-zone.drag-over { border-color: var(--accent2); background: rgba(91,141,238,0.06); }
+  .file-label {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--accent); color: #000; font-weight: 600;
+    padding: 12px 24px; border-radius: 10px; font-size: 15px; cursor: pointer;
+  }
+  #load-progress { font-size: 13px; color: var(--muted); min-height: 18px; }
+
+  #session-panel {
+    display: none; padding: 10px 14px; border-bottom: 1px solid var(--border);
+    background: var(--surface); gap: 8px; flex-wrap: wrap; align-items: center;
+  }
+  #search-input {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); padding: 7px 12px; font-size: 13px; flex: 1; min-width: 140px;
+  }
+  .dist-chip {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 20px;
+    color: var(--muted); padding: 5px 13px; font-size: 12px; cursor: pointer; white-space: nowrap;
+  }
+  .dist-chip.active { background: var(--accent2); color: #fff; border-color: var(--accent2); }
+  .file-label.small { padding: 6px 14px; font-size: 12px; }
+
+  #session-list-wrap { display: none; padding: 10px 14px 4px; max-height: 38vh; overflow-y: auto; }
+  .date-group { margin-bottom: 14px; }
+  .date-group-label {
+    font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;
+    margin-bottom: 6px; font-weight: 600;
+  }
+  .date-group-list {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(150px,1fr));
+    gap: 8px;
+  }
+  .session-btn {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 9px 11px; text-align: left; cursor: pointer; color: var(--text);
+  }
+  .session-btn:hover { border-color: var(--muted); }
+  .session-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
+  .session-btn .nm { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .session-btn .meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .session-btn.active .meta { color: #3a2a00; }
+
+  #content { padding: 14px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  #empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; color: var(--muted); gap: 10px; text-align: center; }
+  #empty-state .big { font-size: 44px; }
+
+  #session-info {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 13px 16px; width: 100%; max-width: 660px;
+  }
+  .si-top { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+  .si-name { font-size: 17px; font-weight: 700; }
+  .si-badge {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
+    padding: 2px 8px; font-size: 11px; color: var(--muted);
+  }
+  .si-meta { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+  .si-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(72px,1fr)); gap: 8px; }
+  .si-stat { text-align: center; }
+  .si-stat .v { font-size: 17px; font-weight: 700; }
+  .si-stat .l { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+
+  #score-strip {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 10px 14px; width: 100%; max-width: 660px;
+  }
+  .ss-top { display: flex; gap: 12px; align-items: baseline; margin-bottom: 8px; flex-wrap: wrap; }
+  #ss-total { font-size: 28px; font-weight: 700; color: var(--accent); line-height: 1; }
+  #ss-shots { font-size: 13px; color: var(--muted); }
+  #ss-grid { display: flex; flex-wrap: wrap; gap: 4px; }
+  .ss-cell {
+    width: 36px; background: var(--surface2); border-radius: 6px;
+    display: flex; flex-direction: column; align-items: center; padding: 4px 0; cursor: pointer;
+  }
+  .ss-cell.sighter { opacity: .55; }
+  .ss-cell.selected { background: var(--accent); }
+  .ss-cell.selected .num, .ss-cell.selected .sc { color: #000; }
+  .ss-cell .num { font-size: 9px; color: var(--muted); }
+  .ss-cell .sc { font-size: 13px; font-weight: 700; }
+
+  #target-wrap {
+    width: 100%; max-width: 660px; background: #1a1a1a;
+    border: 1px solid var(--border); border-radius: 14px; overflow: hidden;
+    position: relative; touch-action: none;
+  }
+  #target-canvas { display: block; width: 100%; height: auto; cursor: pointer; }
+
+  #shot-detail {
+    display: none; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 9px 14px; width: 100%; max-width: 660px;
+    font-size: 13px; align-items: center; flex-wrap: wrap; gap: 12px;
+  }
+  #shot-detail .sd-num { font-size: 18px; font-weight: 700; color: var(--accent); }
+  .sd-dismiss { margin-left: auto; color: var(--muted); cursor: pointer; font-size: 20px; line-height: 1; }
+
+  #shot-table-wrap {
+    width: 100%; max-width: 660px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+  }
+  #shot-table-wrap h3 {
+    font-size: 11px; padding: 10px 14px; margin: 0; border-bottom: 1px solid var(--border);
+    color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase;
+  }
+  #shot-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  #shot-table th { padding: 7px 12px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); background: var(--surface2); }
+  #shot-table td { padding: 6px 12px; border-top: 1px solid var(--border); }
+  #shot-table tr { cursor: pointer; }
+  #shot-table tr:hover { background: rgba(255,255,255,0.03); }
+  #shot-table tr.sighter td { color: var(--muted); font-style: italic; }
+  #shot-table tr.row-selected { background: rgba(232,160,32,0.12); }
+  .sc-pill {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 22px; height: 20px; padding: 0 5px; border-radius: 5px;
+    font-size: 12px; font-weight: 700; background: var(--surface2);
+  }
+  .sc-pill.V { background: var(--accent); color: #000; }
+  .sc-pill.X { background: #e0507a; color: #fff; }
+
+  @media (max-width: 480px) {
+    #header h1 { font-size: 14px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <h1>Silver Mountain Viewer
+    <div class="sub">shotslog CSV reader</div>
+  </h1>
+  <button id="back-btn" class="back-btn" style="display:none" onclick="returnToStart()">← New File</button>
+</div>
+
+<div id="load-screen">
+  <h2>Load Shot Log</h2>
+  <p>Select a Silver Mountain <strong>shotslog.csv</strong> export — every string and shot in the file will be loaded and made searchable.</p>
+  <div class="drop-zone" id="drop-zone">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke="#e8a020" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+    </svg>
+    <label for="file-input" class="file-label">Select CSV File</label>
+    <input type="file" id="file-input" accept=".csv" style="display:none">
+    <div id="load-progress"></div>
+  </div>
+</div>
+
+<div id="session-panel">
+  <input type="text" id="search-input" placeholder="Search shooter or target...">
+  <div class="dist-chip active" data-dist="" onclick="filterDist(&#39;&#39;)">All</div>
+  <div id="dist-chips"></div>
+  <label for="file-input-more" class="file-label small">+ Add File</label>
+  <input type="file" id="file-input-more" accept=".csv" style="display:none">
+</div>
+<div id="session-list-wrap"></div>
+
+<div id="content">
+  <div id="empty-state">
+    <div class="big">🎯</div>
+    <div>Select a session above to view shots</div>
+  </div>
+
+  <div id="session-info" style="display:none"></div>
+  <div id="score-strip" style="display:none"></div>
+
+  <div id="target-wrap" style="display:none">
+    <canvas id="target-canvas"></canvas>
+  </div>
+
+  <div id="shot-detail">
+    <div class="sd-num" id="sd-num"></div>
+    <div id="sd-score"></div>
+    <div id="sd-xy" style="color:var(--muted)"></div>
+    <div id="sd-vel" style="color:var(--muted)"></div>
+    <div class="sd-dismiss" onclick="clearHighlight()">✕</div>
+  </div>
+
+  <div id="shot-table-wrap" style="display:none">
+    <h3>Shot log — tap row to highlight on target</h3>
+    <table id="shot-table">
+      <thead><tr><th>#</th><th>Score</th><th>Interval</th><th>fps</th><th>X mm</th><th>Y mm</th></tr></thead>
+      <tbody id="shot-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// Ring definitions for AU faces (approximate NRAA / Fullbore Australia spec).
+// Used only to draw a representative target face; actual scoring
+// already comes from the 'value' field in the CSV, not recomputed here.
+// ============================================================
+const FACE_DRAW_RINGS = {
+  'AU-600m': [
+    { label:'2', dia: 925 },
+    { label:'3', dia: 663 },
+    { label:'4', dia: 457.5 },
+    { label:'5/6', dia: 303 },
+    { label:'V', dia: 148 },
+    { label:'X', dia: 75.5 },
+  ],
+  'AU-LR': [
+    { label:'2', dia: 1280 },
+    { label:'3', dia: 921 },
+    { label:'4', dia: 560 },
+    { label:'5/6', dia: 413.5 },
+    { label:'V', dia: 261 },
+    { label:'X', dia: 133.5 },
+  ],
+};
+
+const MS_TO_FPS = 3.28084;
+
+let currentId = null;
+let selectedShot = null;
+let allFaces = new Set();
+let activeFaceFilter = '';
+window.__loadedSessions = [];
+
+function prog(msg) { document.getElementById('load-progress').textContent = msg; }
+
+document.getElementById('file-input').addEventListener('change', e => handleFile(e.target.files[0]));
+document.getElementById('file-input-more').addEventListener('change', e => handleFile(e.target.files[0]));
+
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('drag-over');
+  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+
+async function handleFile(file) {
+  if (!file) return;
+  prog(`Reading ${file.name}...`);
+  try {
+    const text = await file.text();
+    const added = parseShotsLog(text);
+    prog('');
+    showApp();
+    filterSessions();
+    if (added === 0) prog('No sessions found in file — check format');
+  } catch (err) {
+    console.error(err);
+    prog('Failed to parse file — check it is a valid shotslog.csv export');
+  }
+}
+
+function parseShotsLog(text) {
+  const lines = text.split(/\r?\n/);
+  const blocks = [];
+  let cur = null;
+
+  for (let i = 1; i < lines.length; i++) { // skip header row 0
+    const line = lines[i];
+    if (line.startsWith('### next string')) {
+      if (cur) blocks.push(cur);
+      cur = { meta: null, shots: [] };
+      continue;
+    }
+    if (line.startsWith('###')) continue; // footer marker etc
+    if (!line.trim()) continue;
+
+    if (cur && cur.meta === null) {
+      cur.meta = line.split(',');
+      continue;
+    }
+    if (cur) {
+      cur.shots.push(line.split(','));
+    }
+  }
+  if (cur) blocks.push(cur);
+
+  const sessions = [];
+  let idCounter = window.__loadedSessions.length;
+  for (const block of blocks) {
+    if (!block.meta) continue;
+    const [name, frame, face, micW, micH] = block.meta;
+    const shots = [];
+    let scoredNum = 0;
+    let sighterNum = 0;
+    for (const row of block.shots) {
+      if (row.length < 18) continue;
+      const ts = parseInt(row[8]);
+      const sighter = row[12] === 'sighter';
+      const value = row[13];
+      const x = parseFloat(row[14]);
+      const y = parseFloat(row[15]);
+      const isMiss = value === '0' && x === 0 && y === 0; // off-target: no valid position solution
+      const vMs = parseFloat(row[16]);
+      const fps = vMs ? Math.round(vMs * MS_TO_FPS) : 0;
+      if (sighter) sighterNum++; else scoredNum++;
+      shots.push({
+        num: sighter ? `S${sighterNum}` : String(scoredNum),
+        sighter, value, x, y, fps, ts, isMiss
+      });
+    }
+    if (!shots.length) continue;
+    const id = `s${idCounter++}`;
+    sessions.push({
+      id, name: (name || 'Unnamed').trim(), frame, face,
+      micW: parseFloat(micW), micH: parseFloat(micH),
+      shots,
+      sortTs: shots[0].ts
+    });
+    if (face) allFaces.add(face);
+  }
+
+  window.__loadedSessions = window.__loadedSessions.concat(sessions);
+  return sessions.length;
+}
+
+function showApp() {
+  document.getElementById('load-screen').style.display = 'none';
+  document.getElementById('session-panel').style.display = 'flex';
+  document.getElementById('session-list-wrap').style.display = 'block';
+  document.getElementById('back-btn').style.display = '';
+  renderFaceChips();
+}
+
+function renderFaceChips() {
+  const wrap = document.getElementById('dist-chips');
+  wrap.innerHTML = '';
+  [...allFaces].sort().forEach(f => {
+    const chip = document.createElement('div');
+    chip.className = 'dist-chip' + (activeFaceFilter === f ? ' active' : '');
+    chip.textContent = f;
+    chip.onclick = () => filterDist(f);
+    wrap.appendChild(chip);
+  });
+}
+
+function filterDist(f) {
+  activeFaceFilter = f;
+  filterSessions();
+}
+
+document.getElementById('search-input').addEventListener('input', filterSessions);
+
+function filterSessions() {
+  const all = window.__loadedSessions || [];
+  const q = document.getElementById('search-input').value.toLowerCase();
+  const list = all.filter(s => {
+    const t = !q || s.name.toLowerCase().includes(q) || s.frame.toLowerCase().includes(q);
+    const d = !activeFaceFilter || s.face === activeFaceFilter;
+    return t && d;
+  });
+  list.sort((a,b) => b.sortTs - a.sortTs);
+
+  const groups = {};
+  list.forEach(s => {
+    const d = new Date(s.sortTs);
+    const key = d.toLocaleDateString('en-AU', { weekday:'long', day:'2-digit', month:'long', year:'numeric' });
+    (groups[key] = groups[key] || []).push(s);
+  });
+
+  const c = document.getElementById('session-list-wrap');
+  c.innerHTML = '';
+  Object.keys(groups).forEach(dateKey => {
+    const dg = document.createElement('div');
+    dg.className = 'date-group';
+    const lbl = document.createElement('div');
+    lbl.className = 'date-group-label';
+    lbl.textContent = dateKey;
+    dg.appendChild(lbl);
+    const listEl = document.createElement('div');
+    listEl.className = 'date-group-list';
+    groups[dateKey].forEach(s => {
+      const btn = document.createElement('div');
+      btn.className = 'session-btn' + (s.id === currentId ? ' active' : '');
+      btn.onclick = () => openSession(s.id);
+      const scored = s.shots.filter(sh => !sh.sighter).length;
+      const time = new Date(s.sortTs).toLocaleTimeString('en-AU', {hour:'2-digit',minute:'2-digit'});
+      btn.innerHTML = `<div class="nm">${s.name}</div>
+        <div class="meta">${s.frame} · ${scored} shots · ${time}</div>`;
+      listEl.appendChild(btn);
+    });
+    dg.appendChild(listEl);
+    c.appendChild(dg);
+  });
+
+  renderFaceChips();
+}
+
+function calcGroupMOA(shots, distM) {
+  if (shots.length < 2) return null;
+  let maxD = 0;
+  for (let i = 0; i < shots.length; i++) {
+    for (let j = i+1; j < shots.length; j++) {
+      const d = Math.hypot(shots[i].x - shots[j].x, shots[i].y - shots[j].y);
+      if (d > maxD) maxD = d;
+    }
+  }
+  const distMm = distM * 1000;
+  return maxD / (distMm / 3438);
+}
+
+function faceDistanceM(face) {
+  const m = face.match(/(\d+)m/);
+  if (m) return parseInt(m[1]);
+  return 900; // AU-LR fallback — actual long-range distance varies 800-1000m
+}
+
+function openSession(id) {
+  currentId = id;
+  selectedShot = null;
+  const all = window.__loadedSessions || [];
+  const s = all.find(x => x.id === id);
+  if (!s) return;
+
+  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('session-info').style.display = '';
+  document.getElementById('score-strip').style.display = '';
+  document.getElementById('target-wrap').style.display = '';
+  document.getElementById('shot-table-wrap').style.display = '';
+  document.getElementById('shot-detail').style.display = 'none';
+
+  const scored = s.shots.filter(sh => !sh.sighter);
+  const sighters = s.shots.filter(sh => sh.sighter);
+  const vels = scored.filter(sh => sh.fps > 0).map(sh => sh.fps);
+  let avg = null, sd = null, es = null;
+  if (vels.length) {
+    avg = Math.round(vels.reduce((a,b)=>a+b,0)/vels.length);
+    if (vels.length > 1) {
+      sd = Math.sqrt(vels.map(v=>(v-avg)**2).reduce((a,b)=>a+b,0)/vels.length);
+      es = Math.max(...vels) - Math.min(...vels);
+    }
+  }
+  const distM = faceDistanceM(s.face);
+  const moaShots = scored.filter(sh => !sh.isMiss);
+  const moa = calcGroupMOA(moaShots, distM);
+
+  const dateStr = new Date(s.sortTs).toLocaleDateString('en-AU', {day:'2-digit',month:'short',year:'numeric'});
+  const timeStr = new Date(s.sortTs).toLocaleTimeString('en-AU', {hour:'2-digit',minute:'2-digit'});
+
+  document.getElementById('session-info').innerHTML = `
+    <div class="si-top">
+      <div class="si-name">${s.name}</div>
+      <div class="si-badge">${s.frame}</div>
+      <div class="si-badge">${s.face}</div>
+    </div>
+    <div class="si-meta">${scored.length} shots${sighters.length?` + ${sighters.length} sighter${sighters.length>1?'s':''}`:''} · ${dateStr} ${timeStr}</div>
+    <div class="si-stats">
+      <div class="si-stat"><div class="v">${scored.length}</div><div class="l">Shots</div></div>
+      ${avg!=null?`<div class="si-stat"><div class="v" style="color:var(--accent2)">${avg}</div><div class="l">Avg fps</div></div>`:''}
+      ${sd!=null?`<div class="si-stat"><div class="v" style="color:var(--accent)">${sd.toFixed(1)}</div><div class="l">Std Dev</div></div>`:''}
+      ${es!=null?`<div class="si-stat"><div class="v">${es}</div><div class="l">Spread</div></div>`:''}
+      ${moa!=null?`<div class="si-stat"><div class="v" style="color:var(--purple)">${moa.toFixed(2)}</div><div class="l">Group MOA</div></div>`:''}
+    </div>`;
+
+  let numeric = 0, xCount = 0, vCount = 0;
+  scored.forEach(sh => {
+    if (sh.value === 'X') { numeric += 6; xCount++; }
+    else if (sh.value === 'V') { numeric += 5; vCount++; }
+    else numeric += parseInt(sh.value) || 0;
+  });
+  let totalStr = String(numeric);
+  if (xCount) totalStr += `-${xCount}X`;
+  else if (vCount) totalStr += `-${vCount}V`;
+
+  const allOrdered = [...sighters, ...scored];
+  document.getElementById('score-strip').innerHTML = `
+    <div class="ss-top">
+      <div id="ss-shots">${scored.length} shots</div>
+      <div id="ss-total">${totalStr}</div>
+    </div>
+    <div id="ss-grid">
+      ${allOrdered.map((sh,i) => `
+        <div class="ss-cell ${sh.sighter?'sighter':''}" data-idx="${i}" onclick="highlightShotByOrderedIdx(${i})">
+          <div class="num">${sh.num}</div>
+          <div class="sc">${sh.value}</div>
+        </div>`).join('')}
+    </div>`;
+
+  const tbody = document.getElementById('shot-tbody');
+  let prevTs = null;
+  tbody.innerHTML = allOrdered.map((sh,i) => {
+    const intv = prevTs ? formatInterval(sh.ts - prevTs) : '-';
+    prevTs = sh.ts;
+    const xyCell = sh.isMiss
+      ? `<td colspan="2" style="color:var(--muted);font-style:italic">off target / no position</td>`
+      : `<td>${sh.x.toFixed(1)}</td><td>${sh.y.toFixed(1)}</td>`;
+    return `<tr class="${sh.sighter?'sighter':''}" data-idx="${i}" onclick="highlightShotByOrderedIdx(${i})">
+      <td>${sh.num}</td>
+      <td><span class="sc-pill ${sh.value}">${sh.value}</span></td>
+      <td>${intv}</td>
+      <td>${sh.fps || '-'}</td>
+      ${xyCell}
+    </tr>`;
+  }).join('');
+
+  drawTarget(s);
+  filterSessions();
+}
+
+function formatInterval(ms) {
+  const sec = Math.round(ms/1000);
+  if (sec < 60) return `${sec}s`;
+  return `${Math.floor(sec/60)}m ${sec%60}s`;
+}
+
+function highlightShotByOrderedIdx(idx) {
+  const all = window.__loadedSessions || [];
+  const s = all.find(x => x.id === currentId);
+  if (!s) return;
+  const sighters = s.shots.filter(sh => sh.sighter);
+  const scored = s.shots.filter(sh => !sh.sighter);
+  const allOrdered = [...sighters, ...scored];
+  const sh = allOrdered[idx];
+  if (!sh) return;
+  selectedShot = idx;
+
+  document.querySelectorAll('.ss-cell').forEach(el => el.classList.toggle('selected', +el.dataset.idx === idx));
+  document.querySelectorAll('#shot-table tr').forEach(el => el.classList.toggle('row-selected', +el.dataset.idx === idx));
+
+  document.getElementById('sd-num').textContent = sh.num;
+  document.getElementById('sd-score').innerHTML = `<span class="sc-pill ${sh.value}">${sh.value}</span>`;
+  document.getElementById('sd-xy').textContent = sh.isMiss ? 'off target / no position' : `X: ${sh.x.toFixed(1)}mm  Y: ${sh.y.toFixed(1)}mm`;
+  document.getElementById('sd-vel').textContent = sh.fps ? `${sh.fps} fps` : '';
+  document.getElementById('shot-detail').style.display = 'flex';
+
+  drawTarget(s);
+}
+
+function clearHighlight() {
+  selectedShot = null;
+  document.getElementById('shot-detail').style.display = 'none';
+  document.querySelectorAll('.ss-cell').forEach(el => el.classList.remove('selected'));
+  document.querySelectorAll('#shot-table tr').forEach(el => el.classList.remove('row-selected'));
+  const all = window.__loadedSessions || [];
+  const s = all.find(x => x.id === currentId);
+  if (s) drawTarget(s);
+}
+
+function drawTarget(s) {
+  const canvas = document.getElementById('target-canvas');
+  const wrap = document.getElementById('target-wrap');
+  const dpr = window.devicePixelRatio || 1;
+  const disp = wrap.clientWidth || 600;
+
+  canvas.style.width = disp + 'px';
+  canvas.style.height = disp + 'px';
+  canvas.width = disp * dpr;
+  canvas.height = disp * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, disp, disp);
+
+  const rings = FACE_DRAW_RINGS[s.face] || FACE_DRAW_RINGS['AU-600m'];
+  const boardDia = rings[0].dia * 1.25;
+  const scale = disp / boardDia;
+  const cx = disp / 2, cy = disp / 2;
+
+  ctx.fillStyle = '#1a1a1a';
+  ctx.fillRect(0, 0, disp, disp);
+
+  rings.forEach((r, i) => {
+    const radius = (r.dia / 2) * scale;
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.fillStyle = i % 2 === 0 ? '#e8e8e8' : '#181818';
+    ctx.fill();
+  });
+
+  ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+  ctx.lineWidth = 1;
+  rings.forEach(r => {
+    const radius = (r.dia / 2) * scale;
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.stroke();
+  });
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.beginPath();
+  ctx.moveTo(cx - disp/2, cy); ctx.lineTo(cx + disp/2, cy);
+  ctx.moveTo(cx, cy - disp/2); ctx.lineTo(cx, cy + disp/2);
+  ctx.stroke();
+
+  const sighters = s.shots.filter(sh => sh.sighter);
+  const scored = s.shots.filter(sh => !sh.sighter);
+  const allOrdered = [...sighters, ...scored];
+
+  const dotR = Math.max(4, disp * 0.018);
+  allOrdered.forEach((sh, i) => {
+    if (sh.isMiss) return; // no valid position — don't plot at false centre
+    const px = cx + sh.x * scale;
+    const py = cy - sh.y * scale;
+    const isSel = i === selectedShot;
+
+    ctx.beginPath();
+    ctx.arc(px, py, isSel ? dotR*1.4 : dotR, 0, Math.PI*2);
+    ctx.fillStyle = sh.sighter ? 'rgba(150,150,150,0.65)' : (isSel ? '#e8a020' : 'rgba(91,141,238,0.85)');
+    ctx.fill();
+    ctx.strokeStyle = isSel ? '#fff' : 'rgba(0,0,0,0.4)';
+    ctx.lineWidth = isSel ? 2 : 1;
+    ctx.stroke();
+
+    ctx.fillStyle = isSel ? '#000' : '#fff';
+    ctx.font = `${Math.max(8, dotR*0.9)}px -apple-system, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(sh.num.replace('S',''), px, py);
+  });
+
+  if (scored.length) {
+    const onTarget = scored.filter(sh => !sh.isMiss);
+    if (onTarget.length) {
+      const avgX = onTarget.reduce((a,b)=>a+b.x,0)/onTarget.length;
+      const avgY = onTarget.reduce((a,b)=>a+b.y,0)/onTarget.length;
+      const px = cx + avgX*scale, py = cy - avgY*scale;
+      ctx.strokeStyle = '#e03030';
+      ctx.lineWidth = 2;
+      const cs = 7;
+      ctx.beginPath();
+      ctx.moveTo(px-cs,py); ctx.lineTo(px+cs,py);
+      ctx.moveTo(px,py-cs); ctx.lineTo(px,py+cs);
+      ctx.stroke();
+    }
+  }
+
+  canvas.onclick = (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+    let best = -1, bestD = 999;
+    allOrdered.forEach((sh, i) => {
+      if (sh.isMiss) return;
+      const px = cx + sh.x * scale;
+      const py = cy - sh.y * scale;
+      const d = Math.hypot(clickX - px, clickY - py);
+      if (d < bestD) { bestD = d; best = i; }
+    });
+    if (best >= 0 && bestD < dotR * 3) highlightShotByOrderedIdx(best);
+  };
+}
+
+window.addEventListener('resize', () => {
+  if (!currentId) return;
+  const all = window.__loadedSessions || [];
+  const s = all.find(x => x.id === currentId);
+  if (s) drawTarget(s);
+});
+
+function returnToStart() {
+  window.__loadedSessions = [];
+  currentId = null;
+  selectedShot = null;
+  allFaces = new Set();
+  activeFaceFilter = '';
+  document.getElementById('load-screen').style.display = 'flex';
+  document.getElementById('session-panel').style.display = 'none';
+  document.getElementById('session-list-wrap').style.display = 'none';
+  document.getElementById('back-btn').style.display = 'none';
+  document.getElementById('empty-state').style.display = 'flex';
+  document.getElementById('session-info').style.display = 'none';
+  document.getElementById('score-strip').style.display = 'none';
+  document.getElementById('target-wrap').style.display = 'none';
+  document.getElementById('shot-detail').style.display = 'none';
+  document.getElementById('shot-table-wrap').style.display = 'none';
+  document.getElementById('file-input').value = '';
+  document.getElementById('file-input-more').value = '';
+  prog('');
+}
+</script>
+
+
+</body></html>
