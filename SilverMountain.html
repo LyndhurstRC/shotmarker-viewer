@@ -1,136 +1,178 @@
-<!DOCTYPE html>
-<!-- saved from url=(0061)file:///C:/Users/joshg/Downloads/silvermountain-viewer_2.html -->
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Silver Mountain Viewer</title>
 <meta name="theme-color" content="#1c1c1e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Silver Mountain">
 <style>
   :root {
-    --bg: #1c1c1e; --surface: #2c2c2e; --surface2: #3a3a3c;
-    --border: #444448; --text: #f2f2f7; --muted: #8e8e93;
-    --accent: #e8a020; --accent2: #5b8dee; --green: #4caf50; --purple: #c080e0;
+    --bg: #1c1c1e;
+    --surface: #2c2c2e;
+    --surface2: #3a3a3c;
+    --border: #48484a;
+    --accent: #e8a020;
+    --accent2: #5b8dee;
+    --text: #f2f2f7;
+    --muted: #8e8e93;
   }
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   body {
-    margin: 0; background: var(--bg); color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    min-height: 100vh;
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh; overflow-x: hidden; user-select: none;
   }
 
-  #header {
-    display: flex; align-items: center; gap: 12px;
-    padding: 10px 16px; border-bottom: 1px solid var(--border);
-    background: var(--surface); position: sticky; top: 0; z-index: 10;
+  header {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 12px 16px; display: flex; align-items: center; gap: 10px;
+    position: sticky; top: 0; z-index: 100;
   }
-  #header h1 { font-size: 16px; margin: 0; font-weight: 700; }
-  #header .sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .logo {
+    width: 30px; height: 30px; background: var(--accent); border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; font-weight: 900; color: #000; flex-shrink: 0;
+  }
+  header .title { font-size: 16px; font-weight: 700; }
+  header .sub { font-size: 11px; color: var(--muted); }
   .back-btn {
-    background: var(--surface2); border: 1px solid var(--border);
+    margin-left: auto; background: var(--surface2); border: 1px solid var(--border);
     border-radius: 7px; color: var(--muted); padding: 5px 11px;
-    font-size: 13px; cursor: pointer; white-space: nowrap; margin-left: auto;
+    font-size: 13px; cursor: pointer; white-space: nowrap;
   }
   .back-btn:hover { color: var(--text); border-color: var(--muted); }
 
   #load-screen {
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    min-height: calc(100vh - 56px); padding: 40px 20px; gap: 22px; text-align: center;
+    min-height: calc(100vh - 56px); padding: 40px 20px; text-align: center; gap: 20px;
   }
-  #load-screen h2 { margin: 0; font-size: 22px; }
-  #load-screen p { color: var(--muted); margin: 0; max-width: 360px; font-size: 14px; }
   .drop-zone {
-    border: 2px dashed var(--border); border-radius: 16px;
-    padding: 36px 28px; width: 100%; max-width: 380px;
-    display: flex; flex-direction: column; align-items: center; gap: 14px;
-    transition: border-color .15s, background .15s;
+    border: 2px dashed var(--border); border-radius: 16px; padding: 44px 36px;
+    cursor: pointer; transition: all 0.2s; max-width: 420px; width: 100%;
+    background: var(--surface);
   }
-  .drop-zone.drag-over { border-color: var(--accent2); background: rgba(91,141,238,0.06); }
+  .drop-zone:hover, .drop-zone.drag-over { border-color: var(--accent); background: rgba(232,160,32,0.06); }
+  .drop-zone .icon { font-size: 44px; margin-bottom: 14px; }
+  .drop-zone h2 { font-size: 17px; margin-bottom: 6px; }
+  .drop-zone p { color: var(--muted); font-size: 13px; line-height: 1.5; }
+  .drop-zone input { display: none; }
+  #load-progress { color: var(--accent); font-size: 14px; min-height: 20px; }
   .file-label {
     display: inline-flex; align-items: center; gap: 8px;
     background: var(--accent); color: #000; font-weight: 600;
     padding: 12px 24px; border-radius: 10px; font-size: 15px; cursor: pointer;
   }
-  #load-progress { font-size: 13px; color: var(--muted); min-height: 18px; }
+
+  #app { display: none; flex-direction: column; min-height: calc(100vh - 56px); }
 
   #session-panel {
-    display: none; padding: 10px 14px; border-bottom: 1px solid var(--border);
-    background: var(--surface); gap: 8px; flex-wrap: wrap; align-items: center;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    max-height: 42vh; overflow-y: auto; flex-shrink: 0;
+  }
+  #session-panel::-webkit-scrollbar { width: 4px; }
+  #session-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .sp-top {
+    display: flex; align-items: center; gap: 8px; padding: 8px 10px 6px;
+    flex-wrap: wrap; position: sticky; top: 0; background: var(--surface);
+    z-index: 10; border-bottom: 1px solid var(--border);
   }
   #search-input {
     background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
-    color: var(--text); padding: 7px 12px; font-size: 13px; flex: 1; min-width: 140px;
+    color: var(--text); padding: 6px 10px; font-size: 13px; width: 150px; flex-shrink: 0;
   }
-  .dist-chip {
-    background: var(--surface2); border: 1px solid var(--border); border-radius: 20px;
-    color: var(--muted); padding: 5px 13px; font-size: 12px; cursor: pointer; white-space: nowrap;
+  #search-input:focus { outline: none; border-color: var(--accent); }
+  #dist-filters { display: flex; gap: 5px; flex-wrap: wrap; }
+  .filter-chip {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 14px;
+    padding: 4px 10px; font-size: 12px; cursor: pointer; color: var(--muted); white-space: nowrap;
   }
-  .dist-chip.active { background: var(--accent2); color: #fff; border-color: var(--accent2); }
-  .file-label.small { padding: 6px 14px; font-size: 12px; }
+  .filter-chip.active { background: rgba(91,141,238,0.2); border-color: var(--accent2); color: var(--accent2); }
 
-  #session-list-wrap { display: none; padding: 10px 14px 4px; max-height: 38vh; overflow-y: auto; }
-  .date-group { margin-bottom: 14px; }
-  .date-group-label {
-    font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;
-    margin-bottom: 6px; font-weight: 600;
+  #session-list { display: flex; flex-direction: column; padding: 0; }
+  .date-group { display: flex; align-items: center; border-bottom: 1px solid var(--border); min-height: 48px; }
+  .date-lbl {
+    font-size: 11px; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;
+    padding: 8px 12px; min-width: 100px; flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    background: var(--surface2);
+    align-self: stretch; display: flex; align-items: center;
   }
-  .date-group-list {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(150px,1fr));
-    gap: 8px;
-  }
+  .date-row { display: flex; gap: 6px; padding: 6px 10px; flex-wrap: wrap; align-items: center; flex: 1; }
   .session-btn {
-    background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
-    padding: 9px 11px; text-align: left; cursor: pointer; color: var(--text);
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 6px 11px; cursor: pointer; white-space: nowrap; color: var(--text);
+    font-size: 12px; flex-shrink: 0; text-align: left;
   }
-  .session-btn:hover { border-color: var(--muted); }
-  .session-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
-  .session-btn .nm { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .session-btn .meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
-  .session-btn.active .meta { color: #3a2a00; }
+  .session-btn.active { border-color: var(--accent); background: rgba(232,160,32,0.15); color: var(--accent); }
+  .s-name { font-weight: 600; font-size: 12px; }
+  .s-meta { font-size: 10px; color: var(--muted); margin-top: 1px; }
+  .session-btn.active .s-meta { color: rgba(232,160,32,0.65); }
 
-  #content { padding: 14px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
-  #empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; color: var(--muted); gap: 10px; text-align: center; }
-  #empty-state .big { font-size: 44px; }
+  #content { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 12px; gap: 12px; }
+  #empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; color: var(--muted); gap: 10px; }
 
   #session-info {
     background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
     padding: 13px 16px; width: 100%; max-width: 660px;
   }
-  .si-top { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
-  .si-name { font-size: 17px; font-weight: 700; }
-  .si-badge {
-    background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
-    padding: 2px 8px; font-size: 11px; color: var(--muted);
+  .info-top { display: flex; gap: 10px; flex-wrap: wrap; align-items: baseline; margin-bottom: 3px; }
+  .info-top h2 { font-size: 17px; font-weight: 700; }
+  .badge {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 5px;
+    padding: 2px 7px; font-size: 11px; color: var(--muted);
   }
-  .si-meta { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
-  .si-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(72px,1fr)); gap: 8px; }
-  .si-stat { text-align: center; }
-  .si-stat .v { font-size: 17px; font-weight: 700; }
-  .si-stat .l { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+  .badge.gold { background: rgba(232,160,32,0.15); border-color: rgba(232,160,32,0.4); color: var(--accent); }
+  .info-sub { font-size: 12px; color: var(--muted); margin-bottom: 9px; }
 
-  #score-strip {
-    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
-    padding: 10px 14px; width: 100%; max-width: 660px;
+  .garmin-panel {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 9px; padding: 7px 12px;
   }
-  .ss-top { display: flex; gap: 12px; align-items: baseline; margin-bottom: 8px; flex-wrap: wrap; }
-  #ss-total { font-size: 28px; font-weight: 700; color: var(--accent); line-height: 1; }
-  #ss-shots { font-size: 13px; color: var(--muted); }
-  #ss-grid { display: flex; flex-wrap: wrap; gap: 4px; }
-  .ss-cell {
-    width: 36px; background: var(--surface2); border-radius: 6px;
-    display: flex; flex-direction: column; align-items: center; padding: 4px 0; cursor: pointer;
-  }
-  .ss-cell.sighter { opacity: .55; }
-  .ss-cell.selected { background: var(--accent); }
-  .ss-cell.selected .num, .ss-cell.selected .sc { color: #000; }
-  .ss-cell .num { font-size: 9px; color: var(--muted); }
-  .ss-cell .sc { font-size: 13px; font-weight: 700; }
+  .garmin-grid { display: flex; gap: 0; justify-content: space-between; }
+  .garmin-stat { text-align: center; flex: 1; }
+  .garmin-stat .gval { font-size: 15px; font-weight: 700; line-height: 1; color: var(--text); }
+  .garmin-stat .gval.sd-hl { font-size: 18px; color: #e8a020; }
+  .garmin-stat .gval.avg-hl { color: var(--accent2); }
+  .garmin-stat .glbl { font-size: 9px; color: var(--muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.4px; }
 
+  /* TARGET */
   #target-wrap {
-    width: 100%; max-width: 660px; background: #1a1a1a;
-    border: 1px solid var(--border); border-radius: 14px; overflow: hidden;
-    position: relative; touch-action: none;
+    background: #000; border: 1px solid var(--border); border-radius: 14px;
+    overflow: hidden; width: 100%; max-width: 660px; position: relative;
+    touch-action: none;
   }
-  #target-canvas { display: block; width: 100%; height: auto; cursor: pointer; }
+  #target-canvas { display: block; width: 100%; height: auto; cursor: grab; }
+  #target-canvas:active { cursor: grabbing; }
+  #zoom-controls {
+    position: absolute; top: 8px; right: 8px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .zoom-btn {
+    width: 34px; height: 34px; border-radius: 8px;
+    background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2);
+    color: #fff; font-size: 20px; font-weight: 300;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .zoom-btn:active { background: rgba(0,0,0,0.75); }
+  #theme-controls {
+    position: absolute; bottom: 8px; right: 8px;
+    display: flex; gap: 5px; align-items: center;
+  }
+  .theme-btn {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: rgba(0,0,0,0.45); border: 2px solid rgba(255,255,255,0.2);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 10px; color: #8c8c8c;
+    transition: border-color 0.15s;
+  }
+  .theme-btn.active { border-color: var(--accent); }
+  .theme-btn:hover { border-color: rgba(255,255,255,0.5); }
 
   #shot-detail {
     display: none; background: var(--surface2); border: 1px solid var(--border);
@@ -138,136 +180,192 @@
     font-size: 13px; align-items: center; flex-wrap: wrap; gap: 12px;
   }
   #shot-detail .sd-num { font-size: 18px; font-weight: 700; color: var(--accent); }
-  .sd-dismiss { margin-left: auto; color: var(--muted); cursor: pointer; font-size: 20px; line-height: 1; }
+  .sc-pill {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border-radius: 50%;
+    font-weight: 700; font-size: 12px;
+    background: #2a2a2a; color: #fff;
+  }
+  #shot-detail .sd-dismiss { margin-left: auto; color: var(--muted); cursor: pointer; font-size: 20px; line-height: 1; }
+
+  .ss-cell {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 28px; height: 28px; border-radius: 5px;
+    font-weight: 700; font-size: 13px;
+    background: var(--surface2); color: var(--text);
+    border: 1px solid var(--border);
+    cursor: pointer;
+  }
+  .ss-cell:hover { border-color: var(--accent); }
+  .ss-cell.hl { background: var(--accent); color: #000; border-color: var(--accent); }
+  .ss-cell.sighter { background: var(--bg); color: var(--muted); font-size: 11px; }
 
   #shot-table-wrap {
     width: 100%; max-width: 660px; background: var(--surface);
     border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
   }
   #shot-table-wrap h3 {
-    font-size: 11px; padding: 10px 14px; margin: 0; border-bottom: 1px solid var(--border);
+    font-size: 11px; padding: 10px 14px; border-bottom: 1px solid var(--border);
     color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase;
   }
   #shot-table { width: 100%; border-collapse: collapse; font-size: 13px; }
   #shot-table th { padding: 7px 12px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); background: var(--surface2); }
-  #shot-table td { padding: 6px 12px; border-top: 1px solid var(--border); }
-  #shot-table tr { cursor: pointer; }
-  #shot-table tr:hover { background: rgba(255,255,255,0.03); }
-  #shot-table tr.sighter td { color: var(--muted); font-style: italic; }
-  #shot-table tr.row-selected { background: rgba(232,160,32,0.12); }
-  .sc-pill {
-    display: inline-flex; align-items: center; justify-content: center;
-    min-width: 22px; height: 20px; padding: 0 5px; border-radius: 5px;
-    font-size: 12px; font-weight: 700; background: var(--surface2);
-  }
-  .sc-pill.V { background: var(--accent); color: #000; }
-  .sc-pill.X { background: #e0507a; color: #fff; }
+  #shot-table td { padding: 7px 12px; border-top: 1px solid var(--border); cursor: pointer; }
+  #shot-table tr.excluded td { opacity: 0.35; text-decoration: line-through; }
+  #shot-table tr.excluded td:last-child { text-decoration: none; }
+  .excl-btn { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 14px; padding: 0 2px; line-height: 1; }
+  .excl-btn:hover { color: #e03030; }
+  tr.excluded .excl-btn { color: #2a7a3b; }
+  tr.excluded .excl-btn:hover { color: #4caf50; }
+  #shot-table tr.hl td { background: rgba(232,160,32,0.12); }
+  #shot-table tr:hover td { background: rgba(255,255,255,0.04); }
 
   @media (max-width: 480px) {
-    #header h1 { font-size: 14px; }
+    header .title { font-size: 14px; }
   }
 </style>
 </head>
 <body>
 
-<div id="header">
-  <h1>Silver Mountain Viewer
+<header>
+  <div class="logo">SM</div>
+  <div>
+    <div class="title">Silver Mountain Viewer</div>
     <div class="sub">shotslog CSV reader</div>
-  </h1>
+  </div>
   <button id="back-btn" class="back-btn" style="display:none" onclick="returnToStart()">← New File</button>
-</div>
+</header>
 
 <div id="load-screen">
-  <h2>Load Shot Log</h2>
-  <p>Select a Silver Mountain <strong>shotslog.csv</strong> export — every string and shot in the file will be loaded and made searchable.</p>
   <div class="drop-zone" id="drop-zone">
-    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke="#e8a020" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-    </svg>
-    <label for="file-input" class="file-label">Select CSV File</label>
-    <input type="file" id="file-input" accept=".csv" style="display:none">
-    <div id="load-progress"></div>
+    <div class="icon">🎯</div>
+    <h2>Load Shot Log</h2>
+    <p>Select a Silver Mountain <strong>shotslog.csv</strong> export.<br>Every string and shot will be loaded and made searchable.</p>
+    <label for="file-input" class="file-label" style="margin-top:14px">Select CSV File</label>
+    <input type="file" id="file-input" accept=".csv">
   </div>
+  <div id="load-progress"></div>
 </div>
 
-<div id="session-panel">
-  <input type="text" id="search-input" placeholder="Search shooter or target...">
-  <div class="dist-chip active" data-dist="" onclick="filterDist(&#39;&#39;)">All</div>
-  <div id="dist-chips"></div>
-  <label for="file-input-more" class="file-label small">+ Add File</label>
-  <input type="file" id="file-input-more" accept=".csv" style="display:none">
-</div>
-<div id="session-list-wrap"></div>
-
-<div id="content">
-  <div id="empty-state">
-    <div class="big">🎯</div>
-    <div>Select a session above to view shots</div>
+<div id="app">
+  <div id="session-panel">
+    <div class="sp-top">
+      <input type="text" id="search-input" placeholder="🔍  Search…" oninput="filterSessions()">
+      <div id="dist-filters"></div>
+      <label for="file-input-more" class="file-label" style="padding:5px 11px;font-size:12px">+ Add File</label>
+      <input type="file" id="file-input-more" accept=".csv" style="display:none">
+    </div>
+    <div id="session-list"></div>
   </div>
 
-  <div id="session-info" style="display:none"></div>
-  <div id="score-strip" style="display:none"></div>
+  <div id="content">
+    <div id="empty-state">
+      <div class="big" style="display:flex;justify-content:center">
+        <svg width="90" height="72" viewBox="0 0 90 72" xmlns="http://www.w3.org/2000/svg">
+          <rect x="0" y="0" width="90" height="72" rx="6" fill="#1a1a1a" stroke="#555" stroke-width="1.5"/>
+          <circle cx="45" cy="36" r="30" fill="white"/>
+          <circle cx="45" cy="36" r="24" fill="#1a1a1a"/>
+          <circle cx="45" cy="36" r="18" fill="white"/>
+          <circle cx="45" cy="36" r="12" fill="#1a1a1a"/>
+          <circle cx="45" cy="36" r="6"  fill="white"/>
+          <circle cx="45" cy="36" r="3"  fill="#1a1a1a"/>
+        </svg>
+      </div>
+      <div style="text-align:center">Select a session above to view shots</div>
+    </div>
 
-  <div id="target-wrap" style="display:none">
-    <canvas id="target-canvas"></canvas>
-  </div>
+    <div id="session-info" style="display:none"></div>
 
-  <div id="shot-detail">
-    <div class="sd-num" id="sd-num"></div>
-    <div id="sd-score"></div>
-    <div id="sd-xy" style="color:var(--muted)"></div>
-    <div id="sd-vel" style="color:var(--muted)"></div>
-    <div class="sd-dismiss" onclick="clearHighlight()">✕</div>
-  </div>
+    <div id="score-strip" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 14px;width:100%;max-width:660px;">
+      <div style="display:flex;gap:12px;align-items:baseline;margin-bottom:8px;flex-wrap:wrap">
+        <div id="ss-shots" style="font-size:13px;color:var(--muted)"></div>
+        <div id="ss-total" style="font-size:28px;font-weight:700;color:#e8a020;line-height:1"></div>
+        <div style="margin-left:auto;text-align:right">
+          <div id="ss-avg" style="font-size:13px;color:var(--accent2)"></div>
+          <div id="ss-sd" style="font-size:13px;color:var(--muted)"></div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;overflow-x:auto">
+        <div id="ss-grid" style="display:flex;flex-wrap:nowrap;gap:4px;flex:1;min-width:0"></div>
+      </div>
+    </div>
 
-  <div id="shot-table-wrap" style="display:none">
-    <h3>Shot log — tap row to highlight on target</h3>
-    <table id="shot-table">
-      <thead><tr><th>#</th><th>Score</th><th>Interval</th><th>fps</th><th>X mm</th><th>Y mm</th></tr></thead>
-      <tbody id="shot-tbody"></tbody>
-    </table>
+    <div id="target-wrap" style="display:none">
+      <canvas id="target-canvas"></canvas>
+      <div id="zoom-controls">
+        <div class="zoom-btn" onclick="changeZoom(1.5)">+</div>
+        <div class="zoom-btn" onclick="changeZoom(1/1.5)">−</div>
+        <div class="zoom-btn" style="font-size:14px;font-weight:600" onclick="resetZoom()" title="Fit shots">⊡</div>
+        <div class="zoom-btn" style="font-size:13px;font-weight:600" onclick="zoomFullTarget()" title="Show full target">⛶</div>
+        <div class="zoom-btn" style="font-size:15px" onclick="saveImage()" title="Save image">💾</div>
+      </div>
+      <div id="theme-controls">
+        <div class="theme-btn active" onclick="setTheme('shotmarker',this)" title="Shotmarker Grey">⬤</div>
+        <div class="theme-btn" onclick="setTheme('paper',this)" title="Paper" style="color:#c8b060">⬤</div>
+        <div class="theme-btn" onclick="setTheme('dark',this)" title="High Contrast Dark" style="color:#444">⬤</div>
+        <div class="theme-btn" onclick="setTheme('green',this)" title="Night Vision" style="color:#00bb55">⬤</div>
+        <div class="theme-btn" onclick="setTheme('steel',this)" title="Blue Steel" style="color:#4488bb">⬤</div>
+      </div>
+      <div style="position:absolute;bottom:8px;left:8px">
+        <button onclick="saveStageImage()" style="background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#fff;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px">💾 Save Stage</button>
+      </div>
+    </div>
+
+    <div id="shot-detail">
+      <div class="sd-num" id="sd-num"></div>
+      <div id="sd-score"></div>
+      <div id="sd-xy" style="color:var(--muted)"></div>
+      <div id="sd-vel" style="color:var(--muted)"></div>
+      <div class="sd-dismiss" onclick="clearHighlight()">✕</div>
+    </div>
+
+    <div id="shot-table-wrap" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:8px">
+        <h3 style="margin:0">Shot log — tap row to highlight on target</h3>
+      </div>
+      <table id="shot-table">
+        <thead><tr><th>#</th><th>Score</th><th>Interval</th><th>fps</th><th>X mm</th><th>Y mm</th><th></th></tr></thead>
+        <tbody id="shot-tbody"></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
 <script>
 // ============================================================
-// Ring definitions for AU faces (approximate NRAA / Fullbore Australia spec).
-// Used only to draw a representative target face; actual scoring
-// already comes from the 'value' field in the CSV, not recomputed here.
+// Ring geometry — approximate NRAA / Fullbore Australia spec
+// (radii in mm from centre). Matches the same data shape as
+// the Shotmarker viewer's OFFICIAL_RINGS table so calcScale()
+// and drawTarget() can be reused almost verbatim.
 // ============================================================
-const FACE_DRAW_RINGS = {
-  'AU-600m': [
-    { label:'2', dia: 925 },
-    { label:'3', dia: 663 },
-    { label:'4', dia: 457.5 },
-    { label:'5/6', dia: 303 },
-    { label:'V', dia: 148 },
-    { label:'X', dia: 75.5 },
-  ],
-  'AU-LR': [
-    { label:'2', dia: 1280 },
-    { label:'3', dia: 921 },
-    { label:'4', dia: 560 },
-    { label:'5/6', dia: 413.5 },
-    { label:'V', dia: 261 },
-    { label:'X', dia: 133.5 },
-  ],
+const OFFICIAL_RINGS = {
+  'AU-600m': { board:{w:1800,h:1800}, r:[75.5,148,303,457.5,663,925],   l:['X','V','5','4','3','2'] },
+  'AU-LR':   { board:{w:2400,h:1800}, r:[133.5,261,413.5,560,921,1280], l:['X','V','5','4','3','2'] },
 };
 
 const MS_TO_FPS = 3.28084;
 
+// ── State ────────────────────────────────────────────────────────────────────
+let sessions = [];        // flat list of all parsed sessions
 let currentId = null;
+let currentMeta = null;   // session object currently open
+let currentShots = [];    // scored shots for current session
+let currentSighters = []; // sighter shots for current session
 let selectedShot = null;
+let excludedShots = {};   // {sessionId: Set(index)}
 let allFaces = new Set();
-let activeFaceFilter = '';
-window.__loadedSessions = [];
+let activeDistFilter = '';
+let zoom = 1, panX = 0, panY = 0;
+let isDragging=false, isPinching=false, tapMoved=false;
+let dragStartX=0, dragStartY=0, panStartX=0, panStartY=0, lastPinchDist=0;
 
 function prog(msg) { document.getElementById('load-progress').textContent = msg; }
 
 document.getElementById('file-input').addEventListener('change', e => handleFile(e.target.files[0]));
-document.getElementById('file-input-more').addEventListener('change', e => handleFile(e.target.files[0]));
+document.getElementById('file-input-more').addEventListener('change', e => { handleFile(e.target.files[0]); e.target.value=''; });
 
 const dz = document.getElementById('drop-zone');
+dz.addEventListener('click', () => document.getElementById('file-input').click());
 dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
 dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
 dz.addEventListener('drop', e => {
@@ -303,27 +401,20 @@ function parseShotsLog(text) {
       cur = { meta: null, shots: [] };
       continue;
     }
-    if (line.startsWith('###')) continue; // footer marker etc
+    if (line.startsWith('###')) continue;
     if (!line.trim()) continue;
-
-    if (cur && cur.meta === null) {
-      cur.meta = line.split(',');
-      continue;
-    }
-    if (cur) {
-      cur.shots.push(line.split(','));
-    }
+    if (cur && cur.meta === null) { cur.meta = line.split(','); continue; }
+    if (cur) cur.shots.push(line.split(','));
   }
   if (cur) blocks.push(cur);
 
-  const sessions = [];
-  let idCounter = window.__loadedSessions.length;
+  const added = [];
+  let idCounter = sessions.length;
   for (const block of blocks) {
     if (!block.meta) continue;
     const [name, frame, face, micW, micH] = block.meta;
     const shots = [];
-    let scoredNum = 0;
-    let sighterNum = 0;
+    let scoredNum = 0, sighterNum = 0;
     for (const row of block.shots) {
       if (row.length < 18) continue;
       const ts = parseInt(row[8]);
@@ -331,117 +422,106 @@ function parseShotsLog(text) {
       const value = row[13];
       const x = parseFloat(row[14]);
       const y = parseFloat(row[15]);
-      const isMiss = value === '0' && x === 0 && y === 0; // off-target: no valid position solution
       const vMs = parseFloat(row[16]);
       const fps = vMs ? Math.round(vMs * MS_TO_FPS) : 0;
+      const isMiss = value === '0' && x === 0 && y === 0; // sentinel: no position solution
       if (sighter) sighterNum++; else scoredNum++;
       shots.push({
-        num: sighter ? `S${sighterNum}` : String(scoredNum),
-        sighter, value, x, y, fps, ts, isMiss
+        display_text: sighter ? `S${sighterNum}` : String(scoredNum),
+        sighter, score: value, x, y, v: vMs, fps, ts, isMiss
       });
     }
     if (!shots.length) continue;
     const id = `s${idCounter++}`;
-    sessions.push({
-      id, name: (name || 'Unnamed').trim(), frame, face,
+    const session = {
+      id, name: (name || 'Unnamed').trim(), frame, face_id: face,
+      target_name: frame, dist: face,
       micW: parseFloat(micW), micH: parseFloat(micH),
       shots,
-      sortTs: shots[0].ts
-    });
+      sortTs: shots[0].ts,
+      dateStr: new Date(shots[0].ts).toLocaleDateString('en-AU',{day:'2-digit',month:'short',year:'numeric'}),
+      time: new Date(shots[0].ts).toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'})
+    };
+    sessions.push(session);
+    added.push(session);
     if (face) allFaces.add(face);
   }
-
-  window.__loadedSessions = window.__loadedSessions.concat(sessions);
-  return sessions.length;
+  return added.length;
 }
 
 function showApp() {
   document.getElementById('load-screen').style.display = 'none';
-  document.getElementById('session-panel').style.display = 'flex';
-  document.getElementById('session-list-wrap').style.display = 'block';
+  document.getElementById('app').style.display = 'flex';
   document.getElementById('back-btn').style.display = '';
-  renderFaceChips();
+  buildDistFilters();
 }
 
-function renderFaceChips() {
-  const wrap = document.getElementById('dist-chips');
+function buildDistFilters() {
+  const wrap = document.getElementById('dist-filters');
   wrap.innerHTML = '';
   [...allFaces].sort().forEach(f => {
     const chip = document.createElement('div');
-    chip.className = 'dist-chip' + (activeFaceFilter === f ? ' active' : '');
+    chip.className = 'filter-chip' + (activeDistFilter === f ? ' active' : '');
     chip.textContent = f;
-    chip.onclick = () => filterDist(f);
+    chip.onclick = () => { activeDistFilter = activeDistFilter === f ? '' : f; filterSessions(); };
     wrap.appendChild(chip);
   });
 }
 
-function filterDist(f) {
-  activeFaceFilter = f;
-  filterSessions();
-}
-
-document.getElementById('search-input').addEventListener('input', filterSessions);
-
 function filterSessions() {
-  const all = window.__loadedSessions || [];
   const q = document.getElementById('search-input').value.toLowerCase();
-  const list = all.filter(s => {
+  const list = sessions.filter(s => {
     const t = !q || s.name.toLowerCase().includes(q) || s.frame.toLowerCase().includes(q);
-    const d = !activeFaceFilter || s.face === activeFaceFilter;
+    const d = !activeDistFilter || s.face_id === activeDistFilter;
     return t && d;
   });
   list.sort((a,b) => b.sortTs - a.sortTs);
 
   const groups = {};
-  list.forEach(s => {
-    const d = new Date(s.sortTs);
-    const key = d.toLocaleDateString('en-AU', { weekday:'long', day:'2-digit', month:'long', year:'numeric' });
-    (groups[key] = groups[key] || []).push(s);
-  });
+  list.forEach(s => { (groups[s.dateStr] = groups[s.dateStr] || []).push(s); });
 
-  const c = document.getElementById('session-list-wrap');
+  const c = document.getElementById('session-list');
   c.innerHTML = '';
   Object.keys(groups).forEach(dateKey => {
-    const dg = document.createElement('div');
-    dg.className = 'date-group';
+    const row = document.createElement('div');
+    row.className = 'date-group';
     const lbl = document.createElement('div');
-    lbl.className = 'date-group-label';
+    lbl.className = 'date-lbl';
     lbl.textContent = dateKey;
-    dg.appendChild(lbl);
-    const listEl = document.createElement('div');
-    listEl.className = 'date-group-list';
+    row.appendChild(lbl);
+    const dr = document.createElement('div');
+    dr.className = 'date-row';
     groups[dateKey].forEach(s => {
       const btn = document.createElement('div');
       btn.className = 'session-btn' + (s.id === currentId ? ' active' : '');
       btn.onclick = () => openSession(s.id);
       const scored = s.shots.filter(sh => !sh.sighter).length;
-      const time = new Date(s.sortTs).toLocaleTimeString('en-AU', {hour:'2-digit',minute:'2-digit'});
-      btn.innerHTML = `<div class="nm">${s.name}</div>
-        <div class="meta">${s.frame} · ${scored} shots · ${time}</div>`;
-      listEl.appendChild(btn);
+      btn.innerHTML = `<div class="s-name">${s.name}</div>
+        <div class="s-meta">${s.frame} · ${scored} shots · ${s.time}</div>`;
+      dr.appendChild(btn);
     });
-    dg.appendChild(listEl);
-    c.appendChild(dg);
+    row.appendChild(dr);
+    c.appendChild(row);
   });
 
-  renderFaceChips();
+  buildDistFilters();
 }
 
-function calcGroupMOA(shots, distM) {
-  if (shots.length < 2) return null;
+function calcGroupMOA(shots, distMm) {
+  const valid = shots.filter(s => s.x != null && !s.isMiss);
+  if (valid.length < 2) return null;
   let maxD = 0;
-  for (let i = 0; i < shots.length; i++) {
-    for (let j = i+1; j < shots.length; j++) {
-      const d = Math.hypot(shots[i].x - shots[j].x, shots[i].y - shots[j].y);
+  for (let i = 0; i < valid.length; i++) {
+    for (let j = i+1; j < valid.length; j++) {
+      const d = Math.hypot(valid[i].x - valid[j].x, valid[i].y - valid[j].y);
       if (d > maxD) maxD = d;
     }
   }
-  const distMm = distM * 1000;
   return maxD / (distMm / 3438);
 }
 
 function faceDistanceM(face) {
-  const m = face.match(/(\d+)m/);
+  const m = (face||'').match(/(\d+)m/);
   if (m) return parseInt(m[1]);
   return 900; // AU-LR fallback — actual long-range distance varies 800-1000m
 }
@@ -449,9 +529,13 @@ function faceDistanceM(face) {
 function openSession(id) {
   currentId = id;
   selectedShot = null;
-  const all = window.__loadedSessions || [];
-  const s = all.find(x => x.id === id);
-  if (!s) return;
+  resetZoom();
+
+  currentMeta = sessions.find(s => s.id === id);
+  if (!currentMeta) return;
+
+  currentSighters = currentMeta.shots.filter(s => s.sighter);
+  currentShots = currentMeta.shots.filter(s => !s.sighter);
 
   document.getElementById('empty-state').style.display = 'none';
   document.getElementById('session-info').style.display = '';
@@ -460,243 +544,815 @@ function openSession(id) {
   document.getElementById('shot-table-wrap').style.display = '';
   document.getElementById('shot-detail').style.display = 'none';
 
-  const scored = s.shots.filter(sh => !sh.sighter);
-  const sighters = s.shots.filter(sh => sh.sighter);
-  const vels = scored.filter(sh => sh.fps > 0).map(sh => sh.fps);
-  let avg = null, sd = null, es = null;
-  if (vels.length) {
-    avg = Math.round(vels.reduce((a,b)=>a+b,0)/vels.length);
-    if (vels.length > 1) {
-      sd = Math.sqrt(vels.map(v=>(v-avg)**2).reduce((a,b)=>a+b,0)/vels.length);
-      es = Math.max(...vels) - Math.min(...vels);
-    }
-  }
-  const distM = faceDistanceM(s.face);
-  const moaShots = scored.filter(sh => !sh.isMiss);
-  const moa = calcGroupMOA(moaShots, distM);
-
-  const dateStr = new Date(s.sortTs).toLocaleDateString('en-AU', {day:'2-digit',month:'short',year:'numeric'});
-  const timeStr = new Date(s.sortTs).toLocaleTimeString('en-AU', {hour:'2-digit',minute:'2-digit'});
-
-  document.getElementById('session-info').innerHTML = `
-    <div class="si-top">
-      <div class="si-name">${s.name}</div>
-      <div class="si-badge">${s.frame}</div>
-      <div class="si-badge">${s.face}</div>
-    </div>
-    <div class="si-meta">${scored.length} shots${sighters.length?` + ${sighters.length} sighter${sighters.length>1?'s':''}`:''} · ${dateStr} ${timeStr}</div>
-    <div class="si-stats">
-      <div class="si-stat"><div class="v">${scored.length}</div><div class="l">Shots</div></div>
-      ${avg!=null?`<div class="si-stat"><div class="v" style="color:var(--accent2)">${avg}</div><div class="l">Avg fps</div></div>`:''}
-      ${sd!=null?`<div class="si-stat"><div class="v" style="color:var(--accent)">${sd.toFixed(1)}</div><div class="l">Std Dev</div></div>`:''}
-      ${es!=null?`<div class="si-stat"><div class="v">${es}</div><div class="l">Spread</div></div>`:''}
-      ${moa!=null?`<div class="si-stat"><div class="v" style="color:var(--purple)">${moa.toFixed(2)}</div><div class="l">Group MOA</div></div>`:''}
-    </div>`;
-
-  let numeric = 0, xCount = 0, vCount = 0;
-  scored.forEach(sh => {
-    if (sh.value === 'X') { numeric += 6; xCount++; }
-    else if (sh.value === 'V') { numeric += 5; vCount++; }
-    else numeric += parseInt(sh.value) || 0;
-  });
-  let totalStr = String(numeric);
-  if (xCount) totalStr += `-${xCount}X`;
-  else if (vCount) totalStr += `-${vCount}V`;
-
-  const allOrdered = [...sighters, ...scored];
-  document.getElementById('score-strip').innerHTML = `
-    <div class="ss-top">
-      <div id="ss-shots">${scored.length} shots</div>
-      <div id="ss-total">${totalStr}</div>
-    </div>
-    <div id="ss-grid">
-      ${allOrdered.map((sh,i) => `
-        <div class="ss-cell ${sh.sighter?'sighter':''}" data-idx="${i}" onclick="highlightShotByOrderedIdx(${i})">
-          <div class="num">${sh.num}</div>
-          <div class="sc">${sh.value}</div>
-        </div>`).join('')}
-    </div>`;
-
-  const tbody = document.getElementById('shot-tbody');
-  let prevTs = null;
-  tbody.innerHTML = allOrdered.map((sh,i) => {
-    const intv = prevTs ? formatInterval(sh.ts - prevTs) : '-';
-    prevTs = sh.ts;
-    const xyCell = sh.isMiss
-      ? `<td colspan="2" style="color:var(--muted);font-style:italic">off target / no position</td>`
-      : `<td>${sh.x.toFixed(1)}</td><td>${sh.y.toFixed(1)}</td>`;
-    return `<tr class="${sh.sighter?'sighter':''}" data-idx="${i}" onclick="highlightShotByOrderedIdx(${i})">
-      <td>${sh.num}</td>
-      <td><span class="sc-pill ${sh.value}">${sh.value}</span></td>
-      <td>${intv}</td>
-      <td>${sh.fps || '-'}</td>
-      ${xyCell}
-    </tr>`;
-  }).join('');
-
-  drawTarget(s);
+  renderInfo();
+  renderScoreStrip();
+  renderTable();
+  drawTarget();
   filterSessions();
 }
 
-function formatInterval(ms) {
-  const sec = Math.round(ms/1000);
-  if (sec < 60) return `${sec}s`;
-  return `${Math.floor(sec/60)}m ${sec%60}s`;
+function renderInfo() {
+  const meta = currentMeta, shots = activeShots();
+
+  const vels = shots.filter(s => s.fps > 0).map(s => s.fps);
+
+  let moaHTML = '';
+  if (shots.length >= 2) {
+    const distM = faceDistanceM(meta.face_id);
+    const moa = calcGroupMOA(shots, distM * 1000);
+    if (moa !== null) {
+      moaHTML = `
+        <div class="garmin-stat">
+          <div class="gval" style="color:#c080e0">${moa.toFixed(2)}</div>
+          <div class="glbl">Group MOA</div>
+        </div>`;
+    }
+  }
+
+  let smStatHTML = `
+    <div class="garmin-stat">
+      <div class="gval">${shots.length}</div>
+      <div class="glbl">Shots</div>
+    </div>`;
+
+  if (vels.length > 1) {
+    const avg = vels.reduce((a,b)=>a+b,0)/vels.length;
+    const sd  = Math.sqrt(vels.map(v=>(v-avg)**2).reduce((a,b)=>a+b,0)/vels.length);
+    const es  = Math.max(...vels) - Math.min(...vels);
+    const mx  = Math.max(...vels);
+    const mn  = Math.min(...vels);
+    smStatHTML += `
+      <div class="garmin-stat">
+        <div class="gval avg-hl">${Math.round(avg)}</div>
+        <div class="glbl">Avg fps</div>
+      </div>
+      <div class="garmin-stat">
+        <div class="gval sd-hl">${sd.toFixed(1)}</div>
+        <div class="glbl">Std Dev</div>
+      </div>
+      <div class="garmin-stat">
+        <div class="gval">${Math.round(es)}</div>
+        <div class="glbl">Spread</div>
+      </div>
+      <div class="garmin-stat">
+        <div class="gval">${Math.round(mx)}</div>
+        <div class="glbl">Max fps</div>
+      </div>
+      <div class="garmin-stat">
+        <div class="gval">${Math.round(mn)}</div>
+        <div class="glbl">Min fps</div>
+      </div>`;
+  }
+  smStatHTML += moaHTML;
+
+  document.getElementById('session-info').innerHTML = `
+    <div class="info-top"><h2>${meta.name||'Unnamed'}</h2> <span class="badge">${meta.frame}</span> <span class="badge">${meta.face_id}</span></div>
+    <div class="info-sub">${meta.dateStr} ${meta.time}</div>
+    <div class="garmin-panel"><div class="garmin-grid">${smStatHTML}</div></div>`;
 }
 
-function highlightShotByOrderedIdx(idx) {
-  const all = window.__loadedSessions || [];
-  const s = all.find(x => x.id === currentId);
-  if (!s) return;
-  const sighters = s.shots.filter(sh => sh.sighter);
-  const scored = s.shots.filter(sh => !sh.sighter);
-  const allOrdered = [...sighters, ...scored];
-  const sh = allOrdered[idx];
-  if (!sh) return;
+function renderScoreStrip() {
+  const shots = activeShots(), sighters = currentSighters;
+  const allShots = currentShots;
+
+  document.getElementById('ss-shots').textContent = `${shots.length} shots`;
+
+  let numeric = 0, xCount = 0, vCount = 0;
+  shots.forEach(s => {
+    const sc = String(s.score ?? '');
+    if (sc === 'X') { numeric += 6; xCount++; }
+    else if (sc === 'V') { numeric += 5; vCount++; }
+    else { numeric += parseInt(sc) || 0; }
+  });
+  let totalStr = String(numeric);
+  if (xCount > 0) totalStr += `-${xCount}X`;
+  else if (vCount > 0) totalStr += `-${vCount}V`;
+  document.getElementById('ss-total').textContent = totalStr;
+
+  const vels = shots.map(s => s.fps > 0 ? s.fps : null).filter(Boolean);
+  if (vels.length > 1) {
+    const avg = vels.reduce((a,b)=>a+b,0)/vels.length;
+    const sd = Math.sqrt(vels.map(v=>(v-avg)**2).reduce((a,b)=>a+b,0)/vels.length);
+    document.getElementById('ss-avg').textContent = `avg ${Math.round(avg)}`;
+    document.getElementById('ss-sd').textContent = `SD ${sd.toFixed(1)}`;
+  } else {
+    document.getElementById('ss-avg').textContent = '';
+    document.getElementById('ss-sd').textContent = '';
+  }
+
+  const grid = document.getElementById('ss-grid');
+  grid.innerHTML = '';
+  sighters.forEach((s, i) => {
+    const cell = document.createElement('div');
+    cell.className = 'ss-cell sighter';
+    cell.style.flexDirection = 'column';
+    cell.style.gap = '1px';
+    cell.style.height = '36px';
+    cell.innerHTML = `<span style="font-size:9px;font-weight:400;opacity:0.6;line-height:1">S${i+1}</span><span style="line-height:1">${s.score}</span>`;
+    cell.title = `Sighter ${i+1}`;
+    grid.appendChild(cell);
+  });
+  allShots.forEach((s, i) => {
+    const cell = document.createElement('div');
+    const excl = isExcluded(i);
+    cell.className = 'ss-cell' + (i === selectedShot && !excl ? ' hl' : '');
+    if (excl) cell.style.opacity = '0.25';
+    const lbl = s.display_text != null ? String(s.display_text) : String(i+1);
+    cell.innerHTML = `<span style="font-size:9px;font-weight:400;opacity:0.6;line-height:1">${lbl}</span><span style="line-height:1${excl?' text-decoration:line-through':''}">${String(s.score ?? '?')}</span>`;
+    cell.style.flexDirection = 'column';
+    cell.style.gap = '1px';
+    cell.style.height = '36px';
+    cell.title = excl ? `Shot ${lbl} (excluded)` : `Shot ${lbl}`;
+    cell.onclick = () => highlightShot(i);
+    grid.appendChild(cell);
+  });
+}
+
+function getTargetDef(faceId) {
+  return OFFICIAL_RINGS[faceId] || null;
+}
+
+function calcScale(faceId, allShots, canvasW, zoomVal) {
+  const td = getTargetDef(faceId);
+  if (!td || allShots.length === 0) return { sc: 1, displayR: 500, td };
+
+  const onTarget = allShots.filter(s => !s.isMiss);
+  const maxR = onTarget.length ? Math.max(...onTarget.map(s => Math.sqrt(s.x**2 + s.y**2))) : td.r[0];
+
+  let displayR = td.r[td.r.length - 1];
+  for (let i = 0; i < td.r.length; i++) {
+    if (td.r[i] >= maxR) { displayR = td.r[i]; break; }
+  }
+
+  const sc = (canvasW * 0.425 / displayR) * zoomVal;
+  return { sc, displayR, td };
+}
+
+const THEMES = {
+  shotmarker: { bg:'#111', target:'#8c8c8c', ring:'#ffffff', label:'rgba(255,255,255,0.40)', dot:'#1e1e1e', dotS:'#3a3a3a', num:'#ffffff', sight:'#4a4a4a', sightL:'rgba(200,200,200,0.8)', hl:'#f5c518' },
+  paper:      { bg:'#c8b89a', target:'#e8e0d0', ring:'#2a1a0a', label:'rgba(0,0,0,0.30)', dot:'#1a0a00', dotS:'#5a3a20', num:'#e8e0d0', sight:'#8a7a60', sightL:'rgba(80,60,40,0.8)', hl:'#c8901a' },
+  dark:       { bg:'#000', target:'#1a1a1a', ring:'#ffffff', label:'rgba(255,255,255,0.35)', dot:'#ffffff', dotS:'#aaaaaa', num:'#000000', sight:'#666666', sightL:'rgba(180,180,180,0.8)', hl:'#f5c518' },
+  green:      { bg:'#050f05', target:'#0a1a0a', ring:'#00dd66', label:'rgba(0,220,100,0.40)', dot:'#001a00', dotS:'#00aa44', num:'#00ff88', sight:'#1a3a1a', sightL:'rgba(0,200,80,0.7)', hl:'#f5c518' },
+  steel:      { bg:'#0f1820', target:'#1e2d3d', ring:'#a0c8e8', label:'rgba(160,200,230,0.40)', dot:'#0a1520', dotS:'#2a4a6a', num:'#c8e0f0', sight:'#1a3a5a', sightL:'rgba(120,180,220,0.8)', hl:'#f5c518' },
+};
+let currentTheme = THEMES.shotmarker;
+
+function setTheme(name, el) {
+  currentTheme = THEMES[name];
+  document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  drawTarget();
+}
+
+function drawTarget() {
+  if (!currentMeta) return;
+  const canvas = document.getElementById('target-canvas');
+  const wrap   = document.getElementById('target-wrap');
+  const dpr    = window.devicePixelRatio || 1;
+  const disp   = wrap.clientWidth || 600;
+
+  canvas.style.width  = disp + 'px';
+  canvas.style.height = disp + 'px';
+  canvas.width  = disp * dpr;
+  canvas.height = disp * dpr;
+
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.save();
+  ctx.scale(dpr, dpr);
+  const W = disp;
+
+  ctx.fillStyle = currentTheme.bg;
+  ctx.fillRect(0, 0, W, W);
+
+  const allShots = [...currentShots, ...currentSighters].filter(s => s.x != null);
+  const activeOnly = activeShots().filter(s => s.x != null);
+  const scaleShots = activeOnly.length ? activeOnly : allShots;
+  const { sc, displayR, td } = calcScale(currentMeta.face_id, scaleShots, W, zoom);
+  if (!td) { ctx.restore(); return; }
+
+  const cx = W / 2 + panX;
+  const cy = W / 2 + panY;
+
+  const bw = (td.board ? td.board.w : displayR*2) * sc;
+  const bh = (td.board ? td.board.h : displayR*2) * sc;
+  ctx.fillStyle = currentTheme.target;
+  ctx.fillRect(cx - bw/2, cy - bh/2, bw, bh);
+
+  ctx.strokeStyle = currentTheme.ring;
+  ctx.lineWidth = 1.5;
+  td.r.forEach(r => {
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * sc, 0, Math.PI * 2);
+    ctx.stroke();
+  });
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = currentTheme.label;
+  const bounds = [0, ...td.r];
+  const labelFs = Math.max(10, Math.round((bounds[2] - bounds[1]) * sc * 0.70));
+  ctx.font = `bold ${labelFs}px -apple-system,sans-serif`;
+  for (let i = 0; i < td.l.length; i++) {
+    const mid = (bounds[i] + td.r[i]) / 2 * sc;
+    if (i === 0) {
+      ctx.fillText(td.l[i], cx, cy);
+    } else {
+      ctx.fillText(td.l[i], cx + mid * 0.9, cy);
+      ctx.fillText(td.l[i], cx - mid * 0.9, cy);
+    }
+  }
+
+  const DOT = Math.max(6, Math.round(W / 60));
+  const nfs = DOT * 1.1;
+
+  currentSighters.forEach((s, i) => {
+    if (s.x == null || s.isMiss) return;
+    const px = cx + s.x * sc, py = cy - s.y * sc;
+    if (px < -DOT || px > W+DOT || py < -DOT || py > W+DOT) return;
+    const lbl = s.display_text != null ? String(s.display_text) : `S${i+1}`;
+    dot(ctx, px, py, DOT, currentTheme.sight, currentTheme.dotS, lbl, nfs, currentTheme.sightL);
+  });
+
+  currentShots.forEach((s, i) => {
+    if (s.x == null || s.isMiss) return;
+    const px = cx + s.x * sc, py = cy - s.y * sc;
+    if (px < -DOT || px > W+DOT || py < -DOT || py > W+DOT) return;
+    const excl = isExcluded(i);
+    if (i === selectedShot && !excl) {
+      ctx.beginPath();
+      ctx.arc(px, py, DOT + Math.max(3, DOT*0.5), 0, Math.PI*2);
+      ctx.fillStyle = currentTheme.hl;
+      ctx.fill();
+    }
+    const lbl = s.display_text != null ? String(s.display_text) : String(i+1);
+    if (excl) {
+      ctx.beginPath();
+      ctx.arc(px, py, DOT, 0, Math.PI*2);
+      ctx.strokeStyle = currentTheme.dot;
+      ctx.lineWidth = 1.5;
+      ctx.globalAlpha = 0.3;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    } else {
+      dot(ctx, px, py, DOT, currentTheme.dot, currentTheme.dotS, lbl, nfs, currentTheme.num);
+    }
+  });
+
+  const validShots = activeShots().filter(s => s.x != null && !s.isMiss);
+  if (validShots.length > 1) {
+    const mx = validShots.reduce((a,s) => a + s.x, 0) / validShots.length;
+    const my = validShots.reduce((a,s) => a + s.y, 0) / validShots.length;
+    const gx = cx + mx * sc, gy = cy - my * sc;
+    const arm = Math.max(4, DOT * 0.6);
+    ctx.save();
+    ctx.strokeStyle = '#e03030';
+    ctx.lineWidth = Math.max(1.5, DOT * 0.25);
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(gx - arm, gy); ctx.lineTo(gx + arm, gy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(gx, gy - arm); ctx.lineTo(gx, gy + arm); ctx.stroke();
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+function dot(ctx, x, y, r, fill, stroke, lbl, fs, lc) {
+  ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
+  ctx.fillStyle = fill; ctx.fill();
+  ctx.strokeStyle = stroke; ctx.lineWidth = 0.8; ctx.stroke();
+  ctx.font = `bold ${fs}px -apple-system,sans-serif`;
+  ctx.fillStyle = lc; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(lbl, x, y);
+}
+
+function changeZoom(f) {
+  zoom = Math.min(Math.max(zoom*f, 0.1), 14);
+  if (zoom <= 1) { panX=0; panY=0; }
+  clampPan(); drawTarget();
+}
+function resetZoom() { zoom=1; panX=0; panY=0; drawTarget(); }
+function zoomFullTarget() {
+  if (!currentMeta) return;
+  const td = getTargetDef(currentMeta.face_id);
+  if (!td) return;
+  const allShots = [...currentShots, ...currentSighters].filter(s => s.x != null);
+  if (!allShots.length) return;
+  const W = document.getElementById('target-canvas').offsetWidth;
+  const { sc: sc1, displayR } = calcScale(currentMeta.face_id, allShots, W, 1);
+  const boardR = Math.max(td.board.w, td.board.h) / 2;
+  zoom = (displayR / boardR) * 0.9;
+  panX = 0; panY = 0;
+  drawTarget();
+}
+function clampPan() {
+  if (zoom <= 1) { panX = 0; panY = 0; return; }
+  const disp = getCanvasDisp();
+  const mx = disp * (zoom - 1) / 2;
+  panX = Math.max(-mx, Math.min(mx, panX));
+  panY = Math.max(-mx, Math.min(mx, panY));
+}
+function getCanvasDisp() {
+  return document.getElementById('target-wrap').clientWidth || 600;
+}
+
+const CV = document.getElementById('target-canvas');
+CV.addEventListener('touchstart', e => {
+  e.preventDefault();
+  if (e.touches.length===2) {
+    isPinching=true; isDragging=false;
+    lastPinchDist = pdist(e);
+  } else {
+    isDragging=true; isPinching=false; tapMoved=false;
+    dragStartX=e.touches[0].clientX; dragStartY=e.touches[0].clientY;
+    panStartX=panX; panStartY=panY;
+  }
+},{ passive:false });
+
+CV.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (isPinching && e.touches.length===2) {
+    const d = pdist(e);
+    zoom = Math.min(Math.max(zoom*(d/lastPinchDist),0.1),14);
+    lastPinchDist=d; clampPan(); drawTarget();
+  } else if (isDragging && e.touches.length===1) {
+    const dx=e.touches[0].clientX-dragStartX, dy=e.touches[0].clientY-dragStartY;
+    if (Math.abs(dx)>4||Math.abs(dy)>4) tapMoved=true;
+    panX=panStartX+dx; panY=panStartY+dy; clampPan(); drawTarget();
+  }
+},{ passive:false });
+
+CV.addEventListener('touchend', e => {
+  e.preventDefault();
+  if (isPinching) { isPinching=false; return; }
+  if (isDragging && !tapMoved && e.changedTouches.length===1) {
+    handleTap(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+  }
+  isDragging=false;
+},{ passive:false });
+
+let mdown=false, mmoved=false;
+CV.addEventListener('mousedown', e => { mdown=true; mmoved=false; dragStartX=e.clientX; dragStartY=e.clientY; panStartX=panX; panStartY=panY; });
+CV.addEventListener('mousemove', e => { if(!mdown)return; const dx=e.clientX-dragStartX,dy=e.clientY-dragStartY; if(Math.abs(dx)>3||Math.abs(dy)>3){mmoved=true;} panX=panStartX+dx; panY=panStartY+dy; clampPan(); drawTarget(); });
+CV.addEventListener('mouseup', e => { if(!mmoved) handleTap(e.clientX, e.clientY); mdown=false; });
+CV.addEventListener('wheel', e => { e.preventDefault(); changeZoom(e.deltaY<0?1.15:1/1.15); },{ passive:false });
+
+function pdist(e) {
+  const dx=e.touches[0].clientX-e.touches[1].clientX, dy=e.touches[0].clientY-e.touches[1].clientY;
+  return Math.sqrt(dx*dx+dy*dy);
+}
+
+function handleTap(clientX, clientY) {
+  if (!currentId || !currentShots.length) return;
+  const rect = CV.getBoundingClientRect();
+  const disp = rect.width;
+  const allShots2 = [...currentShots, ...currentSighters].filter(s => s.x != null);
+  const { sc, td } = calcScale(currentMeta.face_id, allShots2, disp, zoom);
+  if (!td) return;
+  const cx = disp / 2 + panX;
+  const cy = disp / 2 + panY;
+  const ox = clientX - rect.left;
+  const oy = clientY - rect.top;
+  const DOT = Math.max(6, Math.round(disp / 60));
+  let found = -1;
+  for (let i = currentShots.length - 1; i >= 0; i--) {
+    const s = currentShots[i]; if (s.x == null || s.isMiss) continue;
+    if (Math.hypot(ox - (cx + s.x*sc), oy - (cy - s.y*sc)) < DOT * 2.5) { found = i; break; }
+  }
+  if (found === -1) clearHighlight();
+  else highlightShot(found);
+}
+
+function highlightShot(idx) {
   selectedShot = idx;
-
-  document.querySelectorAll('.ss-cell').forEach(el => el.classList.toggle('selected', +el.dataset.idx === idx));
-  document.querySelectorAll('#shot-table tr').forEach(el => el.classList.toggle('row-selected', +el.dataset.idx === idx));
-
-  document.getElementById('sd-num').textContent = sh.num;
-  document.getElementById('sd-score').innerHTML = `<span class="sc-pill ${sh.value}">${sh.value}</span>`;
-  document.getElementById('sd-xy').textContent = sh.isMiss ? 'off target / no position' : `X: ${sh.x.toFixed(1)}mm  Y: ${sh.y.toFixed(1)}mm`;
-  document.getElementById('sd-vel').textContent = sh.fps ? `${sh.fps} fps` : '';
+  drawTarget();
+  const s = currentShots[idx];
+  const sc = String(s.score??'?');
   document.getElementById('shot-detail').style.display = 'flex';
-
-  drawTarget(s);
+  document.getElementById('sd-num').textContent = `Shot #${idx+1}`;
+  document.getElementById('sd-score').innerHTML = `<span class="sc-pill">${sc}</span>`;
+  document.getElementById('sd-xy').textContent = s.isMiss ? 'off target / no position' : `X: ${s.x?.toFixed(1)} mm   Y: ${s.y?.toFixed(1)} mm`;
+  document.getElementById('sd-vel').textContent = s.fps ? `${s.fps} fps` : '';
+  document.querySelectorAll('#shot-tbody tr').forEach((tr,i) => tr.classList.toggle('hl', i===idx));
+  const rows = document.querySelectorAll('#shot-tbody tr');
+  if (rows[idx]) rows[idx].scrollIntoView({ block:'nearest', behavior:'smooth' });
+  document.querySelectorAll('#ss-grid .ss-cell:not(.sighter)').forEach((c,i) => c.classList.toggle('hl', i===idx));
+  const cells = document.querySelectorAll('#ss-grid .ss-cell:not(.sighter)');
+  if (cells[idx]) cells[idx].scrollIntoView({ block:'nearest', behavior:'smooth' });
 }
 
 function clearHighlight() {
   selectedShot = null;
   document.getElementById('shot-detail').style.display = 'none';
-  document.querySelectorAll('.ss-cell').forEach(el => el.classList.remove('selected'));
-  document.querySelectorAll('#shot-table tr').forEach(el => el.classList.remove('row-selected'));
-  const all = window.__loadedSessions || [];
-  const s = all.find(x => x.id === currentId);
-  if (s) drawTarget(s);
+  document.querySelectorAll('#shot-tbody tr').forEach(tr=>tr.classList.remove('hl'));
+  document.querySelectorAll('#ss-grid .ss-cell').forEach(c=>c.classList.remove('hl'));
+  drawTarget();
 }
 
-function drawTarget(s) {
-  const canvas = document.getElementById('target-canvas');
-  const wrap = document.getElementById('target-wrap');
-  const dpr = window.devicePixelRatio || 1;
-  const disp = wrap.clientWidth || 600;
+function isExcluded(index) {
+  return excludedShots[currentId]?.has(index) || false;
+}
 
-  canvas.style.width = disp + 'px';
-  canvas.style.height = disp + 'px';
-  canvas.width = disp * dpr;
-  canvas.height = disp * dpr;
-  const ctx = canvas.getContext('2d');
-  ctx.setTransform(1,0,0,1,0,0);
-  ctx.scale(dpr, dpr);
-  ctx.clearRect(0, 0, disp, disp);
+function toggleExclude(index) {
+  if (!excludedShots[currentId]) excludedShots[currentId] = new Set();
+  if (excludedShots[currentId].has(index)) {
+    excludedShots[currentId].delete(index);
+  } else {
+    excludedShots[currentId].add(index);
+    if (selectedShot === index) selectedShot = null;
+  }
+  renderInfo();
+  renderScoreStrip();
+  renderTable();
+  drawTarget();
+}
 
-  const rings = FACE_DRAW_RINGS[s.face] || FACE_DRAW_RINGS['AU-600m'];
-  const boardDia = rings[0].dia * 1.25;
-  const scale = disp / boardDia;
-  const cx = disp / 2, cy = disp / 2;
+function activeShots() {
+  return currentShots.filter((_, i) => !isExcluded(i));
+}
 
-  ctx.fillStyle = '#1a1a1a';
-  ctx.fillRect(0, 0, disp, disp);
+function formatInterval(ms) {
+  const s = Math.round(ms/1000);
+  if (s < 60) return `${s}s`;
+  return `${Math.floor(s/60)}m ${s%60}s`;
+}
 
-  rings.forEach((r, i) => {
-    const radius = (r.dia / 2) * scale;
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-    ctx.fillStyle = i % 2 === 0 ? '#e8e8e8' : '#181818';
-    ctx.fill();
-  });
+function renderTable() {
+  const shots=currentShots, sighters=currentSighters;
+  const allOrdered = [...sighters, ...shots];
+  let html = '';
 
-  ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-  ctx.lineWidth = 1;
-  rings.forEach(r => {
-    const radius = (r.dia / 2) * scale;
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-    ctx.stroke();
-  });
-
-  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-  ctx.beginPath();
-  ctx.moveTo(cx - disp/2, cy); ctx.lineTo(cx + disp/2, cy);
-  ctx.moveTo(cx, cy - disp/2); ctx.lineTo(cx, cy + disp/2);
-  ctx.stroke();
-
-  const sighters = s.shots.filter(sh => sh.sighter);
-  const scored = s.shots.filter(sh => !sh.sighter);
-  const allOrdered = [...sighters, ...scored];
-
-  const dotR = Math.max(4, disp * 0.018);
-  allOrdered.forEach((sh, i) => {
-    if (sh.isMiss) return; // no valid position — don't plot at false centre
-    const px = cx + sh.x * scale;
-    const py = cy - sh.y * scale;
-    const isSel = i === selectedShot;
-
-    ctx.beginPath();
-    ctx.arc(px, py, isSel ? dotR*1.4 : dotR, 0, Math.PI*2);
-    ctx.fillStyle = sh.sighter ? 'rgba(150,150,150,0.65)' : (isSel ? '#e8a020' : 'rgba(91,141,238,0.85)');
-    ctx.fill();
-    ctx.strokeStyle = isSel ? '#fff' : 'rgba(0,0,0,0.4)';
-    ctx.lineWidth = isSel ? 2 : 1;
-    ctx.stroke();
-
-    ctx.fillStyle = isSel ? '#000' : '#fff';
-    ctx.font = `${Math.max(8, dotR*0.9)}px -apple-system, sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(sh.num.replace('S',''), px, py);
-  });
-
-  if (scored.length) {
-    const onTarget = scored.filter(sh => !sh.isMiss);
-    if (onTarget.length) {
-      const avgX = onTarget.reduce((a,b)=>a+b.x,0)/onTarget.length;
-      const avgY = onTarget.reduce((a,b)=>a+b.y,0)/onTarget.length;
-      const px = cx + avgX*scale, py = cy - avgY*scale;
-      ctx.strokeStyle = '#e03030';
-      ctx.lineWidth = 2;
-      const cs = 7;
-      ctx.beginPath();
-      ctx.moveTo(px-cs,py); ctx.lineTo(px+cs,py);
-      ctx.moveTo(px,py-cs); ctx.lineTo(px,py+cs);
-      ctx.stroke();
-    }
+  if (sighters.length) {
+    html += sighters.map((s,i) => {
+      const lbl = s.display_text != null ? String(s.display_text) : `S${i+1}`;
+      const fps = s.fps ? String(s.fps) : '-';
+      const prev = allOrdered[i - 1];
+      const interval = (prev?.ts && s.ts) ? formatInterval(s.ts - prev.ts) : '-';
+      return `<tr style="opacity:0.5">
+        <td style="color:var(--muted)">${lbl}</td>
+        <td><span class="sc-pill" style="background:#444">${s.score}</span></td>
+        <td style="color:var(--muted);font-size:11px">${interval}</td>
+        <td>${fps}</td>
+        <td>${s.isMiss?'-':s.x.toFixed(1)}</td>
+        <td>${s.isMiss?'-':s.y.toFixed(1)}</td>
+        <td></td>
+      </tr>`;
+    }).join('');
   }
 
-  canvas.onclick = (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
-    let best = -1, bestD = 999;
-    allOrdered.forEach((sh, i) => {
-      if (sh.isMiss) return;
-      const px = cx + sh.x * scale;
-      const py = cy - sh.y * scale;
-      const d = Math.hypot(clickX - px, clickY - py);
-      if (d < bestD) { bestD = d; best = i; }
-    });
-    if (best >= 0 && bestD < dotR * 3) highlightShotByOrderedIdx(best);
-  };
+  html += shots.map((s,i) => {
+    const sc = String(s.score??'?');
+    const lbl = s.display_text != null ? String(s.display_text) : String(i+1);
+    const fpsCell = s.fps ? String(s.fps) : '-';
+    const orderIdx = sighters.length + i;
+    const prev = allOrdered[orderIdx - 1];
+    const interval = (prev?.ts && s.ts) ? formatInterval(s.ts - prev.ts) : '-';
+    const excl = isExcluded(i);
+    const exclIcon = excl ? '↩' : '✕';
+    const exclTitle = excl ? 'Re-include shot' : 'Exclude shot';
+    const xyCell = s.isMiss
+      ? `<td colspan="2" style="color:var(--muted);font-style:italic;font-size:11px">off target</td>`
+      : `<td>${s.x.toFixed(1)}</td><td>${s.y.toFixed(1)}</td>`;
+    return `<tr class="${excl?'excluded':''}" onclick="highlightShot(${i})">
+      <td style="color:var(--muted);font-weight:600">${lbl}</td>
+      <td><span class="sc-pill">${sc}</span></td>
+      <td style="color:var(--muted);font-size:11px">${interval}</td>
+      <td>${fpsCell}</td>
+      ${xyCell}
+      <td><button class="excl-btn" title="${exclTitle}" onclick="event.stopPropagation();toggleExclude(${i})">${exclIcon}</button></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('shot-tbody').innerHTML = html;
 }
 
-window.addEventListener('resize', () => {
-  if (!currentId) return;
-  const all = window.__loadedSessions || [];
-  const s = all.find(x => x.id === currentId);
-  if (s) drawTarget(s);
-});
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.lineTo(x+w-r, y);
+  ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+  ctx.lineTo(x+w, y+h-r);
+  ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+  ctx.lineTo(x+r, y+h);
+  ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+  ctx.lineTo(x, y+r);
+  ctx.quadraticCurveTo(x, y, x+r, y);
+  ctx.closePath();
+}
+
+// ── Save target-only image ──────────────────────────────────────────────────
+function saveImage() {
+  if (!currentMeta) return;
+  const meta = currentMeta;
+  const shots = currentShots;
+  const targetCanvas = document.getElementById('target-canvas');
+  const cw = targetCanvas.width;
+  const ch = targetCanvas.height;
+  const dpr = window.devicePixelRatio || 1;
+  const dispW = cw / dpr;
+  const PAD = Math.round(dispW * 0.04);
+  const HEADER_H = Math.round(dispW * 0.22);
+  const out = document.createElement('canvas');
+  out.width  = cw;
+  out.height = ch + HEADER_H * dpr;
+  const ctx = out.getContext('2d');
+  ctx.fillStyle = '#1c1c1e';
+  ctx.fillRect(0, 0, out.width, out.height);
+  ctx.save();
+  ctx.scale(dpr, dpr);
+  ctx.fillStyle = '#f2f2f7';
+  ctx.font = `bold ${Math.round(dispW * 0.055)}px -apple-system, sans-serif`;
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ctx.fillText(meta.name || 'Unnamed', PAD, PAD);
+  ctx.fillStyle = '#8e8e93';
+  ctx.font = `${Math.round(dispW * 0.034)}px -apple-system, sans-serif`;
+  ctx.fillText(`${meta.frame}  ·  ${meta.face_id}  ·  ${meta.dateStr} ${meta.time}`, PAD, PAD + Math.round(dispW * 0.065));
+  let numeric = 0, xCount = 0, vCount = 0;
+  shots.forEach(s => {
+    const sc = String(s.score ?? '');
+    if (sc === 'X') { numeric += 6; xCount++; }
+    else if (sc === 'V') { numeric += 5; vCount++; }
+    else { numeric += parseInt(sc) || 0; }
+  });
+  let totalStr = String(numeric);
+  if (xCount > 0) totalStr += `-${xCount}X`;
+  else if (vCount > 0) totalStr += `-${vCount}V`;
+  ctx.fillStyle = '#e8a020';
+  ctx.font = `bold ${Math.round(dispW * 0.075)}px -apple-system, sans-serif`;
+  ctx.textAlign = 'right';
+  ctx.fillText(totalStr, dispW - PAD, PAD);
+  const vels = shots.map(s => s.fps > 0 ? s.fps : null).filter(Boolean);
+  if (vels.length > 1) {
+    const avg = vels.reduce((a,b)=>a+b,0)/vels.length;
+    const sd = Math.sqrt(vels.map(v=>(v-avg)**2).reduce((a,b)=>a+b,0)/vels.length);
+    ctx.fillStyle = '#5b8dee';
+    ctx.font = `${Math.round(dispW * 0.034)}px -apple-system, sans-serif`;
+    ctx.fillText(`avg ${Math.round(avg)} fps  SD ${sd.toFixed(1)}`, dispW - PAD, PAD + Math.round(dispW * 0.065));
+  }
+  const seqY = PAD + Math.round(dispW * 0.13);
+  const cellW = Math.round(dispW * 0.042);
+  const cellH = Math.round(dispW * 0.050);
+  let sx = PAD;
+  shots.forEach((s, i) => {
+    const lbl = s.display_text != null ? String(s.display_text) : String(i+1);
+    const sc  = String(s.score ?? '?');
+    ctx.fillStyle = i === selectedShot ? '#e8a020' : '#3a3a3c';
+    roundRect(ctx, sx, seqY, cellW, cellH, 3); ctx.fill();
+    ctx.fillStyle = i === selectedShot ? '#000' : '#8e8e93';
+    ctx.font = `${Math.round(cellW * 0.38)}px -apple-system, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillText(lbl, sx + cellW/2, seqY + 2);
+    ctx.fillStyle = i === selectedShot ? '#000' : '#f2f2f7';
+    ctx.font = `bold ${Math.round(cellW * 0.52)}px -apple-system, sans-serif`;
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(sc, sx + cellW/2, seqY + cellH - 2);
+    sx += cellW + 3;
+    if (sx + cellW > dispW - PAD) sx = PAD;
+  });
+  ctx.fillStyle = 'rgba(232,160,32,0.5)';
+  ctx.font = `${Math.round(dispW * 0.028)}px -apple-system, sans-serif`;
+  ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+  ctx.fillText('Silver Mountain Viewer', dispW - PAD, HEADER_H - 6);
+  ctx.restore();
+  ctx.drawImage(targetCanvas, 0, HEADER_H * dpr);
+  const fname = `${(meta.name||'session').replace(/\s+/g,'-')}_${meta.dateStr.replace(/\s+/g,'-')}.png`;
+  const link = document.createElement('a');
+  link.download = fname;
+  link.href = out.toDataURL('image/png');
+  link.click();
+}
+
+// ── Save full stage image (info + score strip + target + table) ────────────
+function saveStageImage() {
+  if (!currentMeta) return;
+  const meta = currentMeta;
+  const shots = activeShots();
+  const dpr   = window.devicePixelRatio || 1;
+  const W     = 900;
+  const PAD   = 24;
+  const COL   = '#f2f2f7';
+  const MUTED = '#8e8e93';
+  const BG    = '#1c1c1e';
+  const SURF  = '#2c2c2e';
+  const SURF2 = '#3a3a3c';
+  const AMBER = '#e8a020';
+  const BLUE  = '#5b8dee';
+
+  const TARGET_SIZE   = W - PAD*2;
+  const HEADER_H      = 100;
+  const INFO_ROW_H    = shots.length > 0 ? 60 : 0;
+  const STRIP_H       = 56;
+  const TABLE_ROW_H   = 22;
+  const TABLE_ROWS    = currentSighters.length + currentShots.length;
+  const TABLE_H       = TABLE_ROWS * TABLE_ROW_H + 28;
+  const TOTAL_H       = HEADER_H + INFO_ROW_H + STRIP_H + 8 + TARGET_SIZE + 12 + TABLE_H + PAD*3;
+
+  const out = document.createElement('canvas');
+  out.width  = W * dpr;
+  out.height = TOTAL_H * dpr;
+  const ctx  = out.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  ctx.fillStyle = BG;
+  ctx.fillRect(0, 0, W, TOTAL_H);
+
+  let y = PAD;
+
+  ctx.fillStyle = COL;
+  ctx.font = 'bold 28px -apple-system,sans-serif';
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ctx.fillText(meta.name || 'Unnamed', PAD, y);
+
+  let numeric = 0, xCount = 0, vCount = 0;
+  currentShots.forEach(s => {
+    const sc = String(s.score??'');
+    if (sc==='X'){numeric+=6;xCount++;}
+    else if(sc==='V'){numeric+=5;vCount++;}
+    else numeric+=parseInt(sc)||0;
+  });
+  let totalStr = String(numeric);
+  if (xCount>0) totalStr+=`-${xCount}X`;
+  else if (vCount>0) totalStr+=`-${vCount}V`;
+  ctx.fillStyle = AMBER;
+  ctx.font = 'bold 38px -apple-system,sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText(totalStr, W-PAD, y);
+
+  y += 36;
+  ctx.fillStyle = MUTED;
+  ctx.font = '14px -apple-system,sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText(`${meta.frame}  ·  ${meta.face_id}  ·  ${meta.dateStr} ${meta.time}`, PAD, y);
+  y += 20;
+
+  ctx.fillStyle = 'rgba(232,160,32,0.4)';
+  ctx.font = '11px -apple-system,sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText('Silver Mountain Viewer', W-PAD, PAD+4);
+
+  y = HEADER_H;
+
+  const smVels = shots.filter(s=>s.fps>0).map(s=>s.fps);
+  const statItems = [];
+  statItems.push({ val: String(shots.length), lbl: 'SHOTS', col: COL });
+  if (smVels.length>1) {
+    const avg=smVels.reduce((a,b)=>a+b,0)/smVels.length;
+    const sd=Math.sqrt(smVels.map(v=>(v-avg)**2).reduce((a,b)=>a+b,0)/smVels.length);
+    const es=Math.max(...smVels)-Math.min(...smVels);
+    statItems.push({ val: Math.round(avg).toString(), lbl: 'AVG FPS', col: BLUE });
+    statItems.push({ val: sd.toFixed(1), lbl: 'STD DEV', col: AMBER });
+    statItems.push({ val: Math.round(es).toString(), lbl: 'SPREAD', col: COL });
+    statItems.push({ val: Math.round(Math.max(...smVels)).toString(), lbl: 'MAX FPS', col: COL });
+    statItems.push({ val: Math.round(Math.min(...smVels)).toString(), lbl: 'MIN FPS', col: COL });
+  }
+  if (shots.length>=2) {
+    const distM = faceDistanceM(meta.face_id);
+    const moa=calcGroupMOA(shots, distM*1000);
+    if (moa) statItems.push({ val: moa.toFixed(2), lbl: 'GROUP MOA', col: '#c080e0' });
+  }
+  if (statItems.length) {
+    const INFO_H = 56;
+    ctx.fillStyle = SURF;
+    ctx.fillRect(PAD, y, W-PAD*2, INFO_H);
+    const statW = (W-PAD*2) / statItems.length;
+    statItems.forEach((st, i) => {
+      const sx2 = PAD + i*statW + statW/2;
+      ctx.fillStyle = st.col;
+      ctx.font = 'bold 18px -apple-system,sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(st.val, sx2, y+18);
+      ctx.fillStyle = MUTED;
+      ctx.font = '9px -apple-system,sans-serif';
+      ctx.fillText(st.lbl, sx2, y+42);
+    });
+    y += INFO_H + 4;
+  }
+
+  ctx.fillStyle = SURF;
+  ctx.fillRect(PAD, y, W-PAD*2, STRIP_H);
+  const cellW = Math.min(36, (W-PAD*2-8) / Math.max(currentShots.length + currentSighters.length, 1) - 3);
+  const cellH = 30;
+  let sx = PAD + 4;
+  const stripY = y + (STRIP_H-cellH)/2;
+  [...currentSighters.map((s,i)=>({s,isSighter:true,i})), ...currentShots.map((s,i)=>({s,isSighter:false,i}))].forEach(({s,isSighter,i}) => {
+    ctx.fillStyle = isSighter ? SURF2 : (i===selectedShot?AMBER:SURF2);
+    roundRect(ctx, sx, stripY, cellW, cellH, 4); ctx.fill();
+    const lbl = isSighter ? `S${i+1}` : (s.display_text!=null?String(s.display_text):String(i+1));
+    const sc  = isSighter ? String(s.score) : String(s.score??'?');
+    ctx.fillStyle = isSighter ? MUTED : (i===selectedShot?'#000':MUTED);
+    ctx.font = `${Math.max(7,cellW*0.35)}px -apple-system,sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillText(lbl, sx+cellW/2, stripY+2);
+    ctx.fillStyle = isSighter ? MUTED : (i===selectedShot?'#000':COL);
+    ctx.font = `bold ${Math.max(8,cellW*0.45)}px -apple-system,sans-serif`;
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(sc, sx+cellW/2, stripY+cellH-2);
+    sx += cellW + 3;
+  });
+  y += STRIP_H + 8;
+
+  const targetCanvas = document.getElementById('target-canvas');
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(PAD, y, TARGET_SIZE, TARGET_SIZE);
+  ctx.clip();
+  ctx.drawImage(targetCanvas, PAD, y, TARGET_SIZE, TARGET_SIZE);
+  ctx.restore();
+  y += TARGET_SIZE + 12;
+
+  const tableCols = [
+    {label:'#',    w:30,  align:'center'},
+    {label:'Score',w:44,  align:'center'},
+    {label:'fps',  w:60,  align:'center'},
+    {label:'Intv', w:54,  align:'center'},
+    {label:'X mm', w:60,  align:'right'},
+    {label:'Y mm', w:60,  align:'right'},
+  ];
+  const tableW = W-PAD*2;
+  const totalColW = tableCols.reduce((a,c)=>a+c.w,0);
+  ctx.fillStyle = SURF2;
+  ctx.fillRect(PAD, y, tableW, 24);
+  let cx = PAD + 4;
+  tableCols.forEach(c => {
+    ctx.fillStyle = MUTED;
+    ctx.font = 'bold 9px -apple-system,sans-serif';
+    ctx.textAlign = c.align; ctx.textBaseline = 'middle';
+    ctx.fillText(c.label.toUpperCase(), cx + (c.align==='right'?c.w:c.align==='center'?c.w/2:0), y+12);
+    cx += c.w;
+  });
+  y += 24;
+
+  const allTableRows = [
+    ...currentSighters.map((s,i) => ({s, isSighter:true, idx:i})),
+    ...currentShots.map((s,i) => ({s, isSighter:false, idx:i}))
+  ];
+
+  allTableRows.forEach(({s, isSighter, idx}, rowIdx) => {
+    const rowY = y + rowIdx * TABLE_ROW_H;
+    if (rowIdx % 2 === 0) { ctx.fillStyle = 'rgba(255,255,255,0.02)'; ctx.fillRect(PAD, rowY, tableW, TABLE_ROW_H); }
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(PAD, rowY); ctx.lineTo(W-PAD, rowY); ctx.stroke();
+
+    const excl = !isSighter && isExcluded(idx);
+    ctx.globalAlpha = excl ? 0.3 : 1;
+
+    const lbl = isSighter ? `S${idx+1}` : (s.display_text!=null?String(s.display_text):String(idx+1));
+    const sc  = String(s.score??'?');
+    const fps = s.fps ? String(s.fps) : '-';
+    const allOrd = [...currentSighters,...currentShots];
+    const prevS  = allOrd[currentSighters.length+(isSighter?idx-1:currentSighters.length+idx-1)];
+    const intv  = (prevS?.ts&&s.ts) ? formatInterval(s.ts-prevS.ts) : '-';
+
+    const vals = [lbl, sc, fps, intv, s.isMiss?'-':s.x.toFixed(1), s.isMiss?'-':s.y.toFixed(1)];
+    const colors = [MUTED, isSighter?MUTED:COL, isSighter?MUTED:COL, MUTED, MUTED, MUTED];
+
+    cx = PAD + 4;
+    tableCols.forEach((c,ci) => {
+      ctx.fillStyle = colors[ci];
+      ctx.font = `${ci===1?'bold ':''}11px -apple-system,sans-serif`;
+      ctx.textAlign = c.align; ctx.textBaseline = 'middle';
+      ctx.fillText(vals[ci], cx+(c.align==='right'?c.w:c.align==='center'?c.w/2:0), rowY+TABLE_ROW_H/2);
+      cx += c.w;
+    });
+    ctx.globalAlpha = 1;
+  });
+
+  const fname = `${(meta.name||'session').replace(/\s+/g,'-')}_${meta.frame}_${meta.dateStr.replace(/\s+/g,'-')}.png`;
+  out.toBlob(blob => {
+    if (window.showSaveFilePicker) {
+      window.showSaveFilePicker({
+        suggestedName: fname,
+        types: [{ description: 'PNG Image', accept: {'image/png': ['.png']} }]
+      }).then(handle => handle.createWritable()).then(writable => {
+        writable.write(blob); return writable.close();
+      }).then(() => prog('Image saved')).catch(e => { if (e.name!=='AbortError') prog('Save failed'); });
+    } else {
+      const link = document.createElement('a');
+      link.download = fname;
+      link.href = URL.createObjectURL(blob);
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(link.href), 5000);
+    }
+  }, 'image/png');
+}
+
+window.addEventListener('resize', () => { if (currentId) drawTarget(); });
 
 function returnToStart() {
-  window.__loadedSessions = [];
+  sessions = [];
   currentId = null;
+  currentMeta = null;
+  currentShots = [];
+  currentSighters = [];
   selectedShot = null;
+  excludedShots = {};
   allFaces = new Set();
-  activeFaceFilter = '';
+  activeDistFilter = '';
+  zoom = 1; panX = 0; panY = 0;
+
   document.getElementById('load-screen').style.display = 'flex';
-  document.getElementById('session-panel').style.display = 'none';
-  document.getElementById('session-list-wrap').style.display = 'none';
+  document.getElementById('app').style.display = 'none';
   document.getElementById('back-btn').style.display = 'none';
   document.getElementById('empty-state').style.display = 'flex';
   document.getElementById('session-info').style.display = 'none';
@@ -709,6 +1365,5 @@ function returnToStart() {
   prog('');
 }
 </script>
-
-
-</body></html>
+</body>
+</html>
