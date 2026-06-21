@@ -378,14 +378,17 @@
 
 <script>
 // ============================================================
-// Ring geometry — approximate NRAA / Fullbore Australia spec
-// (radii in mm from centre). Matches the same data shape as
-// the Shotmarker viewer's OFFICIAL_RINGS table so calcScale()
-// and drawTarget() can be reused almost verbatim.
+// Ring geometry — boundaries derived empirically from the
+// shotslog data itself (radial distance vs scored value),
+// since the assumed NRAA diameters did not match what the
+// Silver Mountain unit actually used for these faces.
+// X and V/6 share the same physical ring boundary; V and 6
+// are different scoring labels Silver Mountain applies to the
+// same ring (V on Target Rifle faces, 6 on F-Class faces).
 // ============================================================
 const OFFICIAL_RINGS = {
-  'AU-600m': { board:{w:1800,h:1800}, r:[75.5,148,303,457.5,663,925],   l:['X','V','5','4','3','2'] },
-  'AU-LR':   { board:{w:2400,h:1800}, r:[133.5,261,413.5,560,921,1280], l:['X','V','5','4','3','2'] },
+  'AU-600m': { board:{w:1800,h:1800}, r:[44,84,166,336,517,684],   l:['X','V','5','4','3','2'] },
+  'AU-LR':   { board:{w:2400,h:1800}, r:[68,132,259,414,574,919], l:['X','V','5','4','3','2'] },
 };
 
 const MS_TO_FPS = 3.28084;
