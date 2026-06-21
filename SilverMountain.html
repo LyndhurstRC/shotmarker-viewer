@@ -413,7 +413,6 @@ document.getElementById('file-input').addEventListener('change', e => handleFile
 document.getElementById('file-input-more').addEventListener('change', e => { handleFile(e.target.files[0]); e.target.value=''; });
 
 const dz = document.getElementById('drop-zone');
-dz.addEventListener('click', () => document.getElementById('file-input').click());
 dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
 dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
 dz.addEventListener('drop', e => {
