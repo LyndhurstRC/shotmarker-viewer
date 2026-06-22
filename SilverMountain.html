@@ -394,7 +394,11 @@ const OFFICIAL_RINGS = {
 const MS_TO_FPS = 3.28084;
 
 // ── State ────────────────────────────────────────────────────────────────────
-let sessions = [];        // flat list of all parsed sessions
+// sessions is an alias for window.__loadedSessions — all existing references work transparently
+Object.defineProperty(window, 'sessions', {
+  get() { return window.__loadedSessions || []; },
+  set(v) { window.__loadedSessions = v; }
+});
 let currentId = null;
 let currentMeta = null;   // session object currently open
 let currentShots = [];    // scored shots for current session
@@ -408,6 +412,97 @@ let isDragging=false, isPinching=false, tapMoved=false;
 let dragStartX=0, dragStartY=0, panStartX=0, panStartY=0, lastPinchDist=0;
 
 function prog(msg) { document.getElementById('load-progress').textContent = msg; }
+
+// ── GitHub auto-load URL ──────────────────────────────────────────────────
+const GITHUB_CSV_URL = 'https://raw.githubusercontent.com/LyndhurstRC/shotmarker-viewer/main/shotslog.csv';
+const STORAGE_KEY    = 'sm_sessions_v1';
+
+// Simple hash of all shot timestamps — reliably identifies a unique session
+function sessionKey(shots) {
+  const ts = shots.map(s => s.ts).filter(Boolean).join('|');
+  // djb2 hash — fast, no crypto needed
+  let h = 5381;
+  for (let i = 0; i < ts.length; i++) h = ((h << 5) + h) ^ ts.charCodeAt(i);
+  return (h >>> 0).toString(16);
+}
+
+function saveToStorage() {
+  try {
+    // Store only the data needed to reconstruct sessions — keep storage lean
+    const payload = window.__loadedSessions.map(s => ({
+      key: s.key,
+      name: s.name, frame: s.frame, face_id: s.face_id,
+      micW: s.micW, micH: s.micH,
+      sortTs: s.sortTs, dateStr: s.dateStr, time: s.time,
+      shots: s.shots
+    }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  } catch(e) {
+    console.warn('localStorage save failed:', e);
+  }
+}
+
+function loadFromStorage() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    // Ensure id field exists (may be missing from older stored data)
+    return parsed.map(s => ({ ...s, id: s.id || s.key }));
+  } catch(e) {
+    return [];
+  }
+}
+
+function mergeSessions(incoming) {
+  // Build a set of keys already in memory
+  const existing = new Set(window.__loadedSessions.map(s => s.key));
+  let added = 0;
+  for (const s of incoming) {
+    if (!existing.has(s.key)) {
+      window.__loadedSessions.push(s);
+      if (s.face_id) allFaces.add(s.face_id);
+      existing.add(s.key);
+      added++;
+    }
+  }
+  return added;
+}
+
+async function autoLoad() {
+  // 1. Restore from localStorage first (instant)
+  const stored = loadFromStorage();
+  if (stored.length) {
+    window.__loadedSessions = stored;
+    stored.forEach(s => { if (s.face_id) allFaces.add(s.face_id); });
+    showApp();
+    filterSessions();
+    prog(`Loaded ${stored.length} sessions from local storage. Checking for new data…`);
+  }
+
+  // 2. Fetch latest CSV from GitHub
+  try {
+    const resp = await fetch(GITHUB_CSV_URL);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const text = await resp.text();
+    const incoming = parseShotsLogToSessions(text);
+    const added = mergeSessions(incoming);
+    if (added > 0) {
+      saveToStorage();
+      prog(`✓ ${added} new session${added>1?'s':''} added (${window.__loadedSessions.length} total)`);
+      showApp();
+      filterSessions();
+    } else {
+      prog(stored.length ? `✓ Up to date — ${window.__loadedSessions.length} sessions` : 'No sessions found in file');
+    }
+  } catch(e) {
+    const msg = stored.length
+      ? `Could not reach GitHub — showing ${stored.length} cached sessions`
+      : 'Could not load data from GitHub — use the file picker below';
+    prog(msg);
+    console.warn('Auto-load failed:', e);
+  }
+}
 
 document.getElementById('file-input').addEventListener('change', e => handleFile(e.target.files[0]));
 document.getElementById('file-input-more').addEventListener('change', e => { handleFile(e.target.files[0]); e.target.value=''; });
@@ -429,19 +524,20 @@ async function handleFile(file) {
     prog('');
     showApp();
     filterSessions();
-    if (added === 0) prog('No sessions found in file — check format');
+    if (added === 0) prog('No new sessions found — all already loaded');
+    else prog(`✓ ${added} new session${added>1?'s':''} added (${window.__loadedSessions.length} total)`);
   } catch (err) {
     console.error(err);
     prog('Failed to parse file — check it is a valid shotslog.csv export');
   }
 }
 
-function parseShotsLog(text) {
+function parseShotsLogToSessions(text) {
   const lines = text.split(/\r?\n/);
   const blocks = [];
   let cur = null;
 
-  for (let i = 1; i < lines.length; i++) { // skip header row 0
+  for (let i = 1; i < lines.length; i++) {
     const line = lines[i];
     if (line.startsWith('### next string')) {
       if (cur) blocks.push(cur);
@@ -455,8 +551,7 @@ function parseShotsLog(text) {
   }
   if (cur) blocks.push(cur);
 
-  const added = [];
-  let idCounter = sessions.length;
+  const result = [];
   for (const block of blocks) {
     if (!block.meta) continue;
     const [name, frame, face, micW, micH] = block.meta;
@@ -471,7 +566,7 @@ function parseShotsLog(text) {
       const y = parseFloat(row[15]);
       const vMs = parseFloat(row[16]);
       const fps = vMs ? Math.round(vMs * MS_TO_FPS) : 0;
-      const isMiss = value === '0' && x === 0 && y === 0; // sentinel: no position solution
+      const isMiss = value === '0' && x === 0 && y === 0;
       if (sighter) sighterNum++; else scoredNum++;
       shots.push({
         display_text: sighter ? `S${sighterNum}` : String(scoredNum),
@@ -479,21 +574,27 @@ function parseShotsLog(text) {
       });
     }
     if (!shots.length) continue;
-    const id = `s${idCounter++}`;
-    const session = {
-      id, name: (name || 'Unnamed').trim(), frame, face_id: face,
+    const key = sessionKey(shots);
+    result.push({
+      id: key,
+      key,
+      name: (name || 'Unnamed').trim(), frame, face_id: face,
       target_name: frame, dist: face,
       micW: parseFloat(micW), micH: parseFloat(micH),
       shots,
       sortTs: shots[0].ts,
       dateStr: new Date(shots[0].ts).toLocaleDateString('en-AU',{day:'2-digit',month:'short',year:'numeric'}),
       time: new Date(shots[0].ts).toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'})
-    };
-    sessions.push(session);
-    added.push(session);
-    if (face) allFaces.add(face);
+    });
   }
-  return added.length;
+  return result;
+}
+
+function parseShotsLog(text) {
+  const incoming = parseShotsLogToSessions(text);
+  const added = mergeSessions(incoming);
+  saveToStorage();
+  return added;
 }
 
 function showApp() {
@@ -1388,6 +1489,11 @@ function saveStageImage() {
 window.addEventListener('resize', () => { if (currentId) drawTarget(); });
 
 function returnToStart() {
+  if (window.__loadedSessions.length > 0) {
+    if (!confirm(`Clear all ${window.__loadedSessions.length} cached sessions and start fresh?`)) return;
+    localStorage.removeItem(STORAGE_KEY);
+  }
+  window.__loadedSessions = [];
   sessions = [];
   currentId = null;
   currentMeta = null;
@@ -1413,6 +1519,10 @@ function returnToStart() {
   document.getElementById('file-input-more').value = '';
   prog('');
 }
+
+// Auto-load on startup
+window.__loadedSessions = [];
+autoLoad();
 </script>
 </body>
 </html>
