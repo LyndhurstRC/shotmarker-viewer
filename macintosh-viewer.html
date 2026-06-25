@@ -444,14 +444,16 @@ function mergeSessions(incoming) {
 }
 
 async function autoLoad() {
+  // Always show the app shell immediately
+  showApp();
+  filterSessions();
+
   // 1. Restore from localStorage first (instant)
   const stored = loadFromStorage();
   if (stored.length) {
     window.__loadedSessions = stored;
     stored.forEach(s => { if (s.face_id) allFaces.add(s.face_id); });
-    showApp();
     filterSessions();
-    prog(`Loaded ${stored.length} sessions from local storage. Checking for new data…`);
   }
 
   // 2. Fetch latest CSV from GitHub
@@ -463,18 +465,14 @@ async function autoLoad() {
     const added = mergeSessions(incoming);
     if (added > 0) {
       saveToStorage();
-      prog(`✓ ${added} new session${added>1?'s':''} added (${window.__loadedSessions.length} total)`);
-      showApp();
-      filterSessions();
-    } else {
-      prog(stored.length ? `✓ Up to date — ${window.__loadedSessions.length} sessions` : 'No sessions found in file');
     }
+    filterSessions();
   } catch(e) {
-    const msg = stored.length
-      ? `Could not reach GitHub — showing ${stored.length} cached sessions`
-      : 'Could not load data from GitHub — use the file picker below';
-    prog(msg);
     console.warn('Auto-load failed:', e);
+    if (!window.__loadedSessions.length) {
+      document.getElementById('empty-state').innerHTML =
+        '<div class="big">🎯</div><div style="text-align:center;color:var(--muted)">Could not load data — check your connection</div>';
+    }
   }
 }
 
@@ -577,8 +575,6 @@ function parseShotsLog(text) {
 function showApp() {
   document.getElementById('load-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
-  document.getElementById('back-btn').style.display = '';
-  
   buildDistFilters();
 }
 
@@ -1484,7 +1480,7 @@ function returnToStart() {
 
   document.getElementById('load-screen').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
-  document.getElementById('back-btn').style.display = 'none';
+  
   
   document.getElementById('empty-state').style.display = 'flex';
   document.getElementById('session-info').style.display = 'none';
