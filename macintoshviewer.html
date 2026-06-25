@@ -379,16 +379,15 @@
 <script>
 // ============================================================
 // Ring geometry — boundaries derived empirically from the
-// shotslog data itself (radial distance vs scored value),
-// since the assumed NRAA diameters did not match what the
-// Silver Mountain unit actually used for these faces.
-// X and V/6 share the same physical ring boundary; V and 6
-// are different scoring labels Silver Mountain applies to the
-// same ring (V on Target Rifle faces, 6 on F-Class faces).
+// shotslog data itself (radial distance vs scored value).
+// X and V/6 share the same physical ring; V appears anywhere
+// within the V/6 zone as a sub-zone label.
 // ============================================================
 const OFFICIAL_RINGS = {
-  'AU-600m': { board:{w:1800,h:1800}, r:[44,84,166,336,517,684],   l:['X','V','5','4','3','2'] },
-  'AU-LR':   { board:{w:2400,h:1800}, r:[68,132,259,414,574,919], l:['X','V','5','4','3','2'] },
+  'AU-300m': { board:{w:900,h:900},   r:[22,39,74,140,195,275],  l:['X','V','5','4','3','2'] },
+  'AU-500m': { board:{w:1500,h:1500}, r:[41,77,149,299,487,650], l:['X','V','5','4','3','2'] },
+  'AU-600m': { board:{w:1800,h:1800}, r:[44,84,166,336,517,684], l:['X','V','5','4','3','2'] },
+  'AU-LR':   { board:{w:2400,h:1800}, r:[68,132,259,414,574,919],l:['X','V','5','4','3','2'] },
 };
 
 const MS_TO_FPS = 3.28084;
@@ -574,17 +573,20 @@ function parseShotsLogToSessions(text) {
       });
     }
     if (!shots.length) continue;
-    const key = sessionKey(shots);
+    const validTs = shots.map(s => s.ts).filter(t => t && !isNaN(t) && t > 1000000000000);
+    if (!validTs.length) continue; // skip sessions with no valid timestamps (1970 date)
+    const sortTs = Math.min(...validTs);
+        const key = sessionKey(shots);
     result.push({
       id: key,
       key,
-      name: (name || 'Unnamed').trim(), frame, face_id: face,
+      name: (name && name.trim()) ? name.trim() : `[${frame}]`, frame, face_id: face,
       target_name: frame, dist: face,
       micW: parseFloat(micW), micH: parseFloat(micH),
       shots,
-      sortTs: shots[0].ts,
-      dateStr: new Date(shots[0].ts).toLocaleDateString('en-AU',{day:'2-digit',month:'short',year:'numeric'}),
-      time: new Date(shots[0].ts).toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'})
+      sortTs,
+      dateStr: new Date(sortTs).toLocaleDateString('en-AU',{day:'2-digit',month:'short',year:'numeric'}),
+      time: new Date(sortTs).toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'})
     });
   }
   return result;
@@ -672,7 +674,7 @@ function calcGroupMOA(shots, distMm) {
 function faceDistanceM(face) {
   const m = (face||'').match(/(\d+)m/);
   if (m) return parseInt(m[1]);
-  return 900; // AU-LR fallback — actual long-range distance varies 800-1000m
+  return 900; // AU-LR fallback
 }
 
 function openSession(id) {
