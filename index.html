@@ -545,72 +545,6 @@ dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dra
 dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
 dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag-over'); if (e.dataTransfer.files[0]) loadTar(e.dataTransfer.files[0]); });
 
-// ── GitHub auto-load ──────────────────────────────────────────────────────
-const SM_GITHUB_URL  = 'https://raw.githubusercontent.com/LyndhurstRC/shotmarker-viewer/main/shotmarker-backup.tar';
-const SM_STORAGE_KEY = 'sm_shotmarker_cache_v1';
-
-function saveSMCache(sessionsArr, shotDataObj) {
-  try {
-    // Store a lightweight summary for instant startup, not full shot data (too large)
-    const summary = sessionsArr.map(s => ({...s}));
-    localStorage.setItem(SM_STORAGE_KEY + '_sessions', JSON.stringify(summary));
-    localStorage.setItem(SM_STORAGE_KEY + '_ts', Date.now().toString());
-  } catch(e) { console.warn('SM cache save failed:', e); }
-}
-
-function loadSMCache() {
-  try {
-    const raw = localStorage.getItem(SM_STORAGE_KEY + '_sessions');
-    const ts  = parseInt(localStorage.getItem(SM_STORAGE_KEY + '_ts') || '0');
-    if (!raw) return null;
-    return { sessions: JSON.parse(raw), ts };
-  } catch(e) { return null; }
-}
-
-async function autoLoadSM() {
-  // 1. Restore session list from cache for instant startup
-  const cache = loadSMCache();
-  if (cache && cache.sessions.length) {
-    sessions = cache.sessions;
-    sessions.forEach(s => allDistances.add(s.dist));
-    sessions.sort((a,b) => b.ts - a.ts);
-    showSMApp('📂 Cached data');
-    buildDistFilters();
-    filterSessions();
-    const age = Math.round((Date.now() - cache.ts) / 60000);
-    prog(`Loaded ${sessions.length} sessions from cache (${age}m ago). Fetching latest…`);
-  }
-
-  // 2. Fetch latest tar from GitHub
-  try {
-    const resp = await fetch(SM_GITHUB_URL);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    prog('Downloading backup…'); await tick();
-    const buf = new Uint8Array(await resp.arrayBuffer());
-    prog('Parsing archive…'); await tick();
-    await loadTarBytes(buf, 'shotmarker-backup.tar');
-  } catch(e) {
-    if (cache && cache.sessions.length) {
-      prog(`Could not reach GitHub — showing ${sessions.length} cached sessions`);
-    } else {
-      prog('Could not auto-load — use the file picker below');
-    }
-    console.warn('SM auto-load failed:', e);
-  }
-}
-
-function showSMApp(filename) {
-  document.getElementById('load-screen').style.display = 'none';
-  document.getElementById('app').style.display = 'flex';
-  document.getElementById('btn-reload').style.display = 'inline-block';
-  document.getElementById('drive-link-hdr').style.display = '';
-  document.getElementById('main-nav').style.display = 'flex';
-  document.getElementById('back-btn').style.display = '';
-  const fnEl = document.getElementById('open-filename');
-  fnEl.textContent = filename;
-  fnEl.style.display = 'block';
-}
-
 async function loadTar(file) {
   prog('Reading file…');
   const bytes = new Uint8Array(await file.arrayBuffer());
@@ -649,12 +583,18 @@ async function loadTarBytes(bytes, filename) {
   }
 
   sessions.sort((a,b) => b.ts - a.ts);
-  saveSMCache(sessions, shotData);
   prog('');
-  showSMApp('📂 ' + filename);
+  document.getElementById('load-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('btn-reload').style.display = 'inline-block';
+  document.getElementById('drive-link-hdr').style.display = '';
+  document.getElementById('main-nav').style.display = 'flex';
+  document.getElementById('back-btn').style.display = '';
+  const fnEl = document.getElementById('open-filename');
+  fnEl.textContent = '📂 ' + filename;
+  fnEl.style.display = 'block';
   buildDistFilters();
   filterSessions();
-  prog(`✓ ${sessions.length} sessions loaded`);
 }
 
 const dec = b => new TextDecoder().decode(b);
@@ -683,8 +623,6 @@ function returnToStart() {
   currentId = null; selectedShot = null; allDistances = new Set(); activeDistFilter = null;
   garminData = {}; excludedShots = {}; garminLibrary = [];
   zoom = 1; panX = 0; panY = 0;
-  localStorage.removeItem(SM_STORAGE_KEY + '_sessions');
-  localStorage.removeItem(SM_STORAGE_KEY + '_ts');
 
   document.getElementById('load-screen').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
@@ -2404,9 +2342,6 @@ function renderDiagnostics() {
 // ── Resize ────────────────────────────────────────────────────────────────────
 let rt;
 window.addEventListener('resize', () => { clearTimeout(rt); rt=setTimeout(()=>{ if(currentId) drawTarget(); },120); });
-
-// Auto-load on startup
-autoLoadSM();
 </script>
 <script>
 if ('serviceWorker' in navigator) {
