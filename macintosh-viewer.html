@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -531,7 +530,7 @@ function parseShotsLogToSessions(text) {
     let scoredNum = 0, sighterNum = 0;
     for (const row of block.shots) {
       if (row.length < 18) continue;
-      const ts = parseInt(row[8]);
+      const ts = Math.round(parseFloat(row[8]));
       const sighter = row[12] === 'sighter';
       const value = row[13];
       const x = parseFloat(row[14]);
