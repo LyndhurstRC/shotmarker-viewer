@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -400,8 +401,9 @@ const DATASETS = {
   }
 };
 let currentDataset = 'macintosh';
-const GITHUB_CSV_URL = DATASETS[currentDataset].url;
-const STORAGE_KEY    = DATASETS[currentDataset].key;
+// Dynamic getters so these always reflect the active dataset
+function GITHUB_CSV_URL() { return DATASETS[currentDataset].url; }
+function STORAGE_KEY()    { return DATASETS[currentDataset].key; }
 
 
 // Simple hash of all shot timestamps — reliably identifies a unique session
@@ -423,7 +425,7 @@ function saveToStorage() {
       sortTs: s.sortTs, dateStr: s.dateStr, time: s.time,
       shots: s.shots
     }));
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    localStorage.setItem(STORAGE_KEY(), JSON.stringify(payload));
   } catch(e) {
     console.warn('localStorage save failed:', e);
   }
@@ -431,7 +433,7 @@ function saveToStorage() {
 
 function loadFromStorage() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY());
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     // Ensure id field exists (may be missing from older stored data)
@@ -1513,7 +1515,7 @@ window.addEventListener('resize', () => { if (currentId) drawTarget(); });
 function returnToStart() {
   if (window.__loadedSessions.length > 0) {
     if (!confirm(`Clear all ${window.__loadedSessions.length} cached sessions and start fresh?`)) return;
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(STORAGE_KEY());
   }
   window.__loadedSessions = [];
   sessions = [];
