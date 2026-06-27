@@ -271,6 +271,12 @@
 <div id="app">
   <div id="session-panel">
     <div class="sp-top">
+      <div id="dataset-toggle" style="display:flex;gap:4px;flex-shrink:0">
+        <button onclick="switchDataset('macintosh')" id="btn-macintosh"
+          style="padding:5px 12px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:#000;font-size:12px;font-weight:600;cursor:pointer">J G McIntosh</button>
+        <button onclick="switchDataset('kings')" id="btn-kings"
+          style="padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer">Kings</button>
+      </div>
       <input type="text" id="search-input" placeholder="🔍  Search…" oninput="filterSessions()">
       <div id="dist-filters"></div>
 <input type="file" id="file-input-more" accept=".csv" style="display:none">
