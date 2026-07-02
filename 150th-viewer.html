@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -282,12 +281,6 @@
 <div id="app">
   <div id="session-panel">
     <div class="sp-top">
-      <div id="dataset-toggle" style="display:flex;gap:4px;flex-shrink:0">
-        <button onclick="switchDataset('macintosh')" id="btn-macintosh"
-          style="padding:5px 12px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:#000;font-size:12px;font-weight:600;cursor:pointer">J G McIntosh</button>
-        <button onclick="switchDataset('kings')" id="btn-kings"
-          style="padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer">Kings</button>
-      </div>
       <input type="text" id="search-input" placeholder="🔍  Search…" oninput="filterSessions()">
       <div id="dist-filters"></div>
 <input type="file" id="file-input-more" accept=".csv" style="display:none">
@@ -411,22 +404,14 @@ let dragStartX=0, dragStartY=0, panStartX=0, panStartY=0, lastPinchDist=0;
 function prog(msg) { document.getElementById('load-progress').textContent = msg; }
 
 // ── GitHub auto-load URL ──────────────────────────────────────────────────
-const DATASETS = {
-  macintosh: {
-    url: 'https://raw.githubusercontent.com/LyndhurstRC/shotmarker-viewer/main/Macintosh.csv',
-    key: 'sm_macintosh_v1',
-    label: 'J G McIntosh'
-  },
-  kings: {
-    url: 'https://raw.githubusercontent.com/LyndhurstRC/shotmarker-viewer/main/Kings.csv',
-    key: 'sm_kings_v1',
-    label: 'Kings'
-  }
-};
-let currentDataset = 'macintosh';
-// Dynamic getters so these always reflect the active dataset
-function GITHUB_CSV_URL() { return DATASETS[currentDataset].url; }
-function STORAGE_KEY()    { return DATASETS[currentDataset].key; }
+// Single combined dataset — sessions tagged by event based on timestamp boundary
+const GITHUB_CSV_URL = () => 'https://raw.githubusercontent.com/LyndhurstRC/shotmarker-viewer/main/Kings.csv';
+const STORAGE_KEY    = () => 'sm_kings_combined_v1';
+// Sessions before this timestamp are J G McIntosh, after are Kings
+const JGM_BOUNDARY_TS = 1782417865878;
+function getEventLabel(sortTs) {
+  return sortTs < JGM_BOUNDARY_TS ? 'J G McIntosh' : 'Kings';
+}
 
 
 // Simple hash of all shot timestamps — reliably identifies a unique session
@@ -481,41 +466,10 @@ function mergeSessions(incoming) {
   return added;
 }
 
-async function switchDataset(name) {
-  currentDataset = name;
-  window.__loadedSessions = [];
-  allFaces = new Set();
-  activeDistFilter = '';
-  currentId = null;
-  currentMeta = null;
-  currentShots = [];
-  currentSighters = [];
-
-  // Update button styles
-  document.getElementById('btn-macintosh').style.background = name==='macintosh' ? 'var(--accent)' : 'var(--surface2)';
-  document.getElementById('btn-macintosh').style.color      = name==='macintosh' ? '#000' : 'var(--muted)';
-  document.getElementById('btn-macintosh').style.borderColor= name==='macintosh' ? 'var(--accent)' : 'var(--border)';
-  document.getElementById('btn-kings').style.background     = name==='kings' ? 'var(--accent)' : 'var(--surface2)';
-  document.getElementById('btn-kings').style.color          = name==='kings' ? '#000' : 'var(--muted)';
-  document.getElementById('btn-kings').style.borderColor    = name==='kings' ? 'var(--accent)' : 'var(--border)';
-
-  // Hide session detail
-  document.getElementById('session-info').style.display = 'none';
-  document.getElementById('score-strip').style.display = 'none';
-  document.getElementById('target-wrap').style.display = 'none';
-  document.getElementById('shot-detail').style.display = 'none';
-  document.getElementById('shot-table-wrap').style.display = 'none';
-  document.getElementById('empty-state').style.display = 'flex';
-
-  filterSessions();
-  await loadDataset(name);
-}
-
-async function loadDataset(name) {
-  const ds = DATASETS[name];
+async function loadDataset() {
   // Try localStorage first
   try {
-    const raw = localStorage.getItem(ds.key);
+    const raw = localStorage.getItem(STORAGE_KEY());
     if (raw) {
       const stored = JSON.parse(raw).map(s => ({ ...s, id: s.id || s.key }));
       if (stored.length) {
@@ -528,12 +482,12 @@ async function loadDataset(name) {
 
   // Fetch from GitHub
   try {
-    const resp = await fetch(ds.url);
+    const resp = await fetch(GITHUB_CSV_URL());
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const text = await resp.text();
     const incoming = parseShotsLogToSessions(text);
     mergeSessions(incoming);
-    try { localStorage.setItem(ds.key, JSON.stringify(window.__loadedSessions)); } catch(e) {}
+    try { localStorage.setItem(STORAGE_KEY(), JSON.stringify(window.__loadedSessions)); } catch(e) {}
     filterSessions();
   } catch(e) {
     console.warn('Dataset load failed:', e);
@@ -543,7 +497,7 @@ async function loadDataset(name) {
 async function autoLoad() {
   showApp();
   filterSessions();
-  await loadDataset(currentDataset);
+  await loadDataset();
 }
 
 document.getElementById('file-input').addEventListener('change', e => handleFile(e.target.files[0]));
@@ -689,10 +643,14 @@ function filterSessions() {
       btn.onclick = () => openSession(s.id);
       const scored = s.shots.filter(sh => !sh.sighter).length;
       const distLabel = s.face_id ? s.face_id.replace('AU-','') : '';
-      const rangeBadge = distLabel
+      const eventLabel = getEventLabel(s.sortTs);
+      const isJGM = eventLabel === 'J G McIntosh';
+      const eventColour = isJGM ? '#e8a020' : '#5b8dee';
+      const distBadge = distLabel
         ? `<span style="background:var(--accent2);color:#fff;border-radius:4px;padding:1px 5px;font-size:9px;font-weight:700;margin-right:4px">${distLabel}</span>`
         : '';
-      btn.innerHTML = `<div class="s-name">${rangeBadge}${s.name}</div>
+      const eventBadge = `<span style="background:${eventColour};color:#000;border-radius:4px;padding:1px 5px;font-size:9px;font-weight:700;margin-right:4px">${isJGM ? 'JGM' : 'Kings'}</span>`;
+      btn.innerHTML = `<div class="s-name">${eventBadge}${distBadge}${s.name}</div>
         <div class="s-meta">${s.frame} · ${scored} shots · ${s.time}</div>`;
       dr.appendChild(btn);
     });
