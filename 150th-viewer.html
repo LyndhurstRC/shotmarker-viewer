@@ -241,6 +241,7 @@
     header .title { font-size: 14px; }
   }
 </style>
+<script data-goatcounter="https://150th.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </head>
 <body>
 
@@ -1531,37 +1532,30 @@ function returnToStart() {
 
 // ── GoatCounter visit tracking & counter ───────────────────────────────────
 (function() {
-  // Track this page view
-  var gc = document.createElement('script');
-  gc.src = 'https://gc.zgo.at/count.js';
-  gc.setAttribute('data-goatcounter', 'https://150th.goatcounter.com/count');
-  gc.async = true;
-  document.head.appendChild(gc);
-
-  // Display visit count — try a few path formats GoatCounter may use
+  // Display visit count
   const el = document.getElementById('visit-count');
-  if (!el) return;
-  const paths = [
-    '/shotmarker-viewer/150th-viewer.html',
-    '/150th-viewer.html',
-    '/',
-  ];
-  (async function() {
-    for (const path of paths) {
-      try {
-        const r = await fetch('https://150th.goatcounter.com/counter/' + encodeURIComponent(path) + '.json');
-        if (r.ok) {
-          const d = await r.json();
-          if (d.count && d.count !== '0') {
-            el.textContent = d.count + ' visits';
-            return;
+  if (el) {
+    const paths = [
+      '/shotmarker-viewer/150th-viewer.html',
+      '/150th-viewer.html',
+      '/',
+    ];
+    (async function() {
+      for (const path of paths) {
+        try {
+          const r = await fetch('https://150th.goatcounter.com/counter/' + encodeURIComponent(path) + '.json');
+          if (r.ok) {
+            const d = await r.json();
+            if (d.count && d.count !== '0') {
+              el.textContent = d.count + ' visits';
+              return;
+            }
           }
-        }
-      } catch(e) {}
-    }
-    // If no count yet, just show 1 (this is the first visit)
-    el.textContent = '1 visit';
-  })();
+        } catch(e) {}
+      }
+      el.textContent = '1 visit';
+    })();
+  }
 })();
 
 // Auto-load on startup
