@@ -1529,17 +1529,23 @@ function returnToStart() {
   prog('');
 }
 
-// ── Visit counter ──────────────────────────────────────────────────────────
-fetch('https://api.countapi.xyz/hit/lyndhurstrc-150th-viewer/visits')
-  .then(r => r.json())
-  .then(d => {
-    const el = document.getElementById('visit-count');
-    if (el && d.value) el.textContent = d.value.toLocaleString() + ' visits';
-  })
-  .catch(() => {
-    const el = document.getElementById('visit-count');
-    if (el) el.textContent = '';
-  });
+// ── GoatCounter visit tracking & counter ───────────────────────────────────
+(function() {
+  // Track this page view
+  var gc = document.createElement('script');
+  gc.src = 'https://gc.zgo.at/count.js';
+  gc.setAttribute('data-goatcounter', 'https://150th.goatcounter.com/count');
+  gc.async = true;
+  document.head.appendChild(gc);
+
+  // Display visit count
+  const el = document.getElementById('visit-count');
+  if (!el) return;
+  fetch('https://150th.goatcounter.com/counter/150th-viewer.html.json')
+    .then(r => r.json())
+    .then(d => { if (el) el.textContent = (d.count || '—') + ' visits'; })
+    .catch(() => { if (el) el.parentElement.style.display = 'none'; });
+})();
 
 // Auto-load on startup
 window.__loadedSessions = [];
