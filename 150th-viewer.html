@@ -263,7 +263,9 @@
   </div>
   <div style="margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:5px">
     <div style="background:#1a3a8f;color:#5b8dee;border:1px solid #5b8dee;border-radius:7px;padding:5px 11px;font-size:13px;font-weight:700">JG</div>
-    <img src="https://hits.sh/lyndhurstrc.github.io/shotmarker-viewer/150th-viewer.html.svg?style=flat&label=Visits&color=003087&labelColor=0055B3" alt="hit counter" style="height:18px">
+    <div style="background:#003087;color:#7AB2E8;border:1px solid #0055B3;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:600;text-align:center;min-width:60px">
+      👁 <span id="visit-count">...</span>
+    </div>
   </div>
 </header>
 
@@ -1526,6 +1528,18 @@ function returnToStart() {
   document.getElementById('file-input-more').value = '';
   prog('');
 }
+
+// ── Visit counter ──────────────────────────────────────────────────────────
+fetch('https://api.countapi.xyz/hit/lyndhurstrc-150th-viewer/visits')
+  .then(r => r.json())
+  .then(d => {
+    const el = document.getElementById('visit-count');
+    if (el && d.value) el.textContent = d.value.toLocaleString() + ' visits';
+  })
+  .catch(() => {
+    const el = document.getElementById('visit-count');
+    if (el) el.textContent = '';
+  });
 
 // Auto-load on startup
 window.__loadedSessions = [];
