@@ -339,6 +339,8 @@
         <div class="zoom-btn" style="font-size:14px;font-weight:600" onclick="resetZoom()" title="Fit shots">⊡</div>
         <div class="zoom-btn" style="font-size:13px;font-weight:600" onclick="zoomFullTarget()" title="Show full target">⛶</div>
         <div class="zoom-btn" style="font-size:15px" onclick="saveImage()" title="Save image">💾</div>
+        <div id="scoring-toggle" onclick="toggleScoringMode()" title="Toggle TR / F-Class rings"
+          style="width:34px;height:34px;border-radius:8px;background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.2);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:pointer;line-height:1.1;text-align:center">F<br>Class</div>
       </div>
       <div id="theme-controls">
         <div class="theme-btn active" onclick="setTheme('shotmarker',this)" title="Shotmarker Grey">⬤</div>
@@ -379,12 +381,21 @@
 // X and V/6 share the same physical ring; V appears anywhere
 // within the V/6 zone as a sub-zone label.
 // ============================================================
+// F-Class rings: X is innermost
 const OFFICIAL_RINGS = {
   'AU-300m': { board:{w:900,h:900},   r:[22,39,74,140,195,275],  l:['X','V','5','4','3','2'] },
   'AU-500m': { board:{w:1500,h:1500}, r:[41,77,149,299,487,650], l:['X','V','5','4','3','2'] },
   'AU-600m': { board:{w:1800,h:1800}, r:[44,84,166,336,517,684], l:['X','V','5','4','3','2'] },
   'AU-LR':   { board:{w:2400,h:1800}, r:[68,132,259,414,574,919],l:['X','V','5','4','3','2'] },
 };
+// TR/Production rings: V is innermost (no X ring)
+const TR_RINGS = {
+  'AU-300m': { board:{w:900,h:900},   r:[39,74,140,195,275],  l:['V','5','4','3','2'] },
+  'AU-500m': { board:{w:1500,h:1500}, r:[77,149,299,487,650], l:['V','5','4','3','2'] },
+  'AU-600m': { board:{w:1800,h:1800}, r:[84,166,336,517,684], l:['V','5','4','3','2'] },
+  'AU-LR':   { board:{w:2400,h:1800}, r:[132,259,414,574,919],l:['V','5','4','3','2'] },
+};
+let scoringMode = 'fclass'; // 'fclass' or 'tr'
 
 const MS_TO_FPS = 3.28084;
 
@@ -828,7 +839,8 @@ function renderScoreStrip() {
 }
 
 function getTargetDef(faceId) {
-  return OFFICIAL_RINGS[faceId] || null;
+  const rings = scoringMode === 'tr' ? TR_RINGS : OFFICIAL_RINGS;
+  return rings[faceId] || null;
 }
 
 function calcScale(faceId, allShots, canvasW, zoomVal) {
@@ -983,6 +995,17 @@ function dot(ctx, x, y, r, fill, stroke, lbl, fs, lc) {
   ctx.font = `bold ${fs}px -apple-system,sans-serif`;
   ctx.fillStyle = lc; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(lbl, x, y);
+}
+
+function toggleScoringMode() {
+  scoringMode = scoringMode === 'fclass' ? 'tr' : 'fclass';
+  const btn = document.getElementById('scoring-toggle');
+  if (btn) {
+    btn.innerHTML = scoringMode === 'tr' ? 'TR' : 'F<br>Class';
+    btn.style.background = scoringMode === 'tr' ? 'rgba(91,141,238,0.6)' : 'rgba(0,0,0,0.5)';
+    btn.style.borderColor = scoringMode === 'tr' ? '#5b8dee' : 'rgba(255,255,255,0.2)';
+  }
+  drawTarget();
 }
 
 function changeZoom(f) {
