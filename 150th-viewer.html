@@ -1538,13 +1538,30 @@ function returnToStart() {
   gc.async = true;
   document.head.appendChild(gc);
 
-  // Display visit count
+  // Display visit count — try a few path formats GoatCounter may use
   const el = document.getElementById('visit-count');
   if (!el) return;
-  fetch('https://150th.goatcounter.com/counter/150th-viewer.html.json')
-    .then(r => r.json())
-    .then(d => { if (el) el.textContent = (d.count || '—') + ' visits'; })
-    .catch(() => { if (el) el.parentElement.style.display = 'none'; });
+  const paths = [
+    '/shotmarker-viewer/150th-viewer.html',
+    '/150th-viewer.html',
+    '/',
+  ];
+  (async function() {
+    for (const path of paths) {
+      try {
+        const r = await fetch('https://150th.goatcounter.com/counter/' + encodeURIComponent(path) + '.json');
+        if (r.ok) {
+          const d = await r.json();
+          if (d.count && d.count !== '0') {
+            el.textContent = d.count + ' visits';
+            return;
+          }
+        }
+      } catch(e) {}
+    }
+    // If no count yet, just show 1 (this is the first visit)
+    el.textContent = '1 visit';
+  })();
 })();
 
 // Auto-load on startup
