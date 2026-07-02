@@ -1530,32 +1530,14 @@ function returnToStart() {
   prog('');
 }
 
-// ── GoatCounter visit tracking & counter ───────────────────────────────────
+// ── GoatCounter visit counter display ──────────────────────────────────────
 (function() {
-  // Display visit count
   const el = document.getElementById('visit-count');
-  if (el) {
-    const paths = [
-      '/shotmarker-viewer/150th-viewer.html',
-      '/150th-viewer.html',
-      '/',
-    ];
-    (async function() {
-      for (const path of paths) {
-        try {
-          const r = await fetch('https://150th.goatcounter.com/counter/' + encodeURIComponent(path) + '.json');
-          if (r.ok) {
-            const d = await r.json();
-            if (d.count && d.count !== '0') {
-              el.textContent = d.count + ' visits';
-              return;
-            }
-          }
-        } catch(e) {}
-      }
-      el.textContent = '1 visit';
-    })();
-  }
+  if (!el) return;
+  fetch('https://150th.goatcounter.com/counter/%2Fshotmarker-viewer%2F150th-viewer.html.json')
+    .then(r => r.json())
+    .then(d => { el.textContent = (d.count || '1') + ' visits'; })
+    .catch(() => { el.parentElement.style.display = 'none'; });
 })();
 
 // Auto-load on startup
