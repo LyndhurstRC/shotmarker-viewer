@@ -359,6 +359,10 @@
     <button class="nav-tab" id="tab-diagnostics" onclick="switchTab('diagnostics')">Hardware</button>
   </div>
   <div style="margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+    <div style="display:flex;gap:6px;align-items:center">
+      <button id="edit-toggle-btn" onclick="toggleEditMode()" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--muted);padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">🔒 Edit</button>
+      <button id="export-edits-btn" onclick="exportEdits()" style="display:none;background:var(--accent2);border:none;border-radius:7px;color:#fff;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">⬇ Export edits</button>
+    </div>
     <input type="file" id="file-input-hdr" accept=".tar" style="display:none">
     <div id="open-filename" style="display:none"></div>
     <div style="font-size:11px;color:var(--accent);text-align:right;font-weight:500">Lyndhurst Rifle Club 2026 — JG</div>
@@ -513,6 +517,114 @@ let garminData = {};  // keyed by session id, value = array of {shotNum, fps, ti
 let excludedShots = {};  // keyed by session id, value = Set of shot indices
 let garminLibrary = []; // all imported Garmin CSVs: [{id, filename, sessionDate, shots, bulletWeight, shotCount}]
 
+// ── Edit overrides (password-gated) ────────────────────────────────────────────
+const EDIT_PASSWORD = '269269';
+const EDITS_STORAGE_KEY = 'sm_edits_v1';
+const EDITS_GITHUB_URL = 'https://raw.githubusercontent.com/LyndhurstRC/shotmarker-viewer/main/shotmarker-edits.json';
+let editMode = false;
+let edits = {};  // { sessionId: { name: "...", scores: { shotIndex: "V" } } }
+
+function loadEditsFromStorage() {
+  try {
+    const raw = localStorage.getItem(EDITS_STORAGE_KEY);
+    if (raw) edits = JSON.parse(raw);
+  } catch(e) { edits = {}; }
+}
+function saveEditsToStorage() {
+  try { localStorage.setItem(EDITS_STORAGE_KEY, JSON.stringify(edits)); } catch(e) {}
+}
+async function loadEditsFromGitHub() {
+  try {
+    const resp = await fetch(EDITS_GITHUB_URL);
+    if (resp.ok) {
+      const remote = await resp.json();
+      // Merge: local storage edits take precedence over remote (in case editing offline)
+      edits = { ...remote, ...edits };
+      saveEditsToStorage();
+    }
+  } catch(e) { /* no edits file yet — fine */ }
+}
+// Apply an override to a session's display name
+function editedName(id, rawName) {
+  return (edits[id] && edits[id].name != null) ? edits[id].name : rawName;
+}
+// Apply an override to a shot's score
+function editedScore(id, shotIndex, rawScore) {
+  if (edits[id] && edits[id].scores && edits[id].scores[shotIndex] != null) {
+    return edits[id].scores[shotIndex];
+  }
+  return rawScore;
+}
+function toggleEditMode() {
+  if (editMode) {
+    editMode = false;
+    updateEditUI();
+    if (currentId) { renderInfo(); renderScoreStrip(); renderTable(); }
+    return;
+  }
+  const pw = prompt('Enter edit password:');
+  if (pw === null) return;
+  if (pw === EDIT_PASSWORD) {
+    editMode = true;
+    updateEditUI();
+    if (currentId) { renderInfo(); renderScoreStrip(); renderTable(); }
+  } else {
+    alert('Incorrect password');
+  }
+}
+function updateEditUI() {
+  const btn = document.getElementById('edit-toggle-btn');
+  const exportBtn = document.getElementById('export-edits-btn');
+  if (btn) {
+    btn.textContent = editMode ? '🔓 Editing' : '🔒 Edit';
+    btn.style.background = editMode ? 'var(--accent)' : 'var(--surface2)';
+    btn.style.color = editMode ? '#000' : 'var(--muted)';
+  }
+  if (exportBtn) exportBtn.style.display = editMode ? 'inline-block' : 'none';
+}
+function commitNameEdit(id, newName) {
+  if (!edits[id]) edits[id] = {};
+  const raw = (sessions.find(s => s.id === id) || {}).name || '';
+  if (newName === raw || newName.trim() === '') {
+    delete edits[id].name;
+  } else {
+    edits[id].name = newName.trim();
+  }
+  // Update the in-memory session so lists refresh
+  const sess = sessions.find(s => s.id === id);
+  if (sess) sess.name = editedName(id, raw);
+  if (edits[id] && Object.keys(edits[id]).length === 0) delete edits[id];
+  saveEditsToStorage();
+  filterSessions();
+}
+function commitScoreEdit(id, shotIndex, newScore) {
+  newScore = (newScore || '').trim().toUpperCase();
+  if (!edits[id]) edits[id] = {};
+  if (!edits[id].scores) edits[id].scores = {};
+  const raw = shotData[id]?.shots?.[shotIndex]?.score;
+  if (newScore === '' || newScore === String(raw)) {
+    delete edits[id].scores[shotIndex];
+  } else {
+    edits[id].scores[shotIndex] = newScore;
+  }
+  if (edits[id].scores && Object.keys(edits[id].scores).length === 0) delete edits[id].scores;
+  if (edits[id] && Object.keys(edits[id]).length === 0) delete edits[id];
+  saveEditsToStorage();
+}
+function exportEdits() {
+  const blob = new Blob([JSON.stringify(edits, null, 2)], { type: 'application/json' });
+  const fname = 'shotmarker-edits.json';
+  if (window.showSaveFilePicker) {
+    window.showSaveFilePicker({ suggestedName: fname, types: [{ description:'JSON', accept:{'application/json':['.json']} }] })
+      .then(h => h.createWritable()).then(w => { w.write(blob); return w.close(); })
+      .catch(()=>{});
+  } else {
+    const a = document.createElement('a');
+    a.download = fname; a.href = URL.createObjectURL(blob); a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  }
+}
+
 // Zoom / pan
 let zoom = 1, panX = 0, panY = 0;
 let isPinching = false, lastPinchDist = 0;
@@ -614,7 +726,7 @@ async function loadTarBytes(bytes, filename) {
     const dateStr = new Date(parseInt(id)).toLocaleDateString('en-AU', { day:'2-digit', month:'short', year:'numeric' });
     const dist = String(meta.distance);
     allDistances.add(dist);
-    sessions.push({ id, ...meta, dateStr, dist });
+    sessions.push({ id, ...meta, name: editedName(id, meta.name), dateStr, dist });
     shotData[id] = parsed;
   }
 
@@ -964,9 +1076,13 @@ function renderInfo() {
   }
   smStatHTML += moaHTML;
 
+  const nameHTML = editMode
+    ? `<input value="${(meta.name||'').replace(/"/g,'&quot;')}" onchange="commitNameEdit('${currentId}', this.value); renderInfo();" style="background:var(--bg);border:1px solid var(--accent);border-radius:5px;color:var(--accent);font-size:14px;font-weight:600;padding:2px 6px;width:160px" title="Edit shooter name">`
+    : `${meta.name||'Unnamed'}`;
+
   const leftHTML = `
     <div class="garmin-panel">
-      <div class="garmin-panel-title"><svg width="14" height="14" viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" style="vertical-align:middle;margin-right:4px;flex-shrink:0"><circle cx="7" cy="7" r="7" fill="white"/><circle cx="7" cy="7" r="5.5" fill="#1a1a1a"/><circle cx="7" cy="7" r="4" fill="white"/><circle cx="7" cy="7" r="2.5" fill="#1a1a1a"/><circle cx="7" cy="7" r="1.2" fill="white"/><circle cx="7" cy="7" r="0.6" fill="#1a1a1a"/></svg> ${meta.name||'Unnamed'} ${grp} <span class="badge" style="font-size:9px">${meta.face_id}</span></div>
+      <div class="garmin-panel-title"><svg width="14" height="14" viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" style="vertical-align:middle;margin-right:4px;flex-shrink:0"><circle cx="7" cy="7" r="7" fill="white"/><circle cx="7" cy="7" r="5.5" fill="#1a1a1a"/><circle cx="7" cy="7" r="4" fill="white"/><circle cx="7" cy="7" r="2.5" fill="#1a1a1a"/><circle cx="7" cy="7" r="1.2" fill="white"/><circle cx="7" cy="7" r="0.6" fill="#1a1a1a"/></svg> ${nameHTML} ${grp} <span class="badge" style="font-size:9px">${meta.face_id}</span></div>
       <div style="font-size:10px;color:var(--muted);margin-bottom:6px">${meta.target_name} · ${meta.dist} · ${meta.dateStr} ${meta.time}</div>
       <div class="garmin-grid">${smStatHTML}</div>
     </div>`;
@@ -985,9 +1101,12 @@ function renderScoreStrip() {
   document.getElementById('ss-shots').textContent = `${shots.length} shots`;
 
   // Total score formatted like Shotmarker: "68-7V" or "42-3X"
+  // Score overrides applied via editedScore()
   let numeric = 0, xCount = 0, vCount = 0;
-  shots.forEach(s => {
-    const sc = String(s.score ?? '');
+  shots.forEach((s, i) => {
+    // Find the original index of this shot in currentShots to look up edit
+    const origIdx = currentShots.indexOf(s);
+    const sc = String(editedScore(currentId, origIdx, s.score ?? ''));
     if (sc === 'X') { numeric += 6; xCount++; }
     else if (sc === 'V') { numeric += 5; vCount++; }
     else { numeric += parseInt(sc) || 0; }
@@ -1033,7 +1152,8 @@ function renderScoreStrip() {
     cell.className = 'ss-cell' + (i === selectedShot && !excl ? ' hl' : '');
     if (excl) cell.style.opacity = '0.25';
     const lbl = s.display_text != null ? String(s.display_text) : String(i+1);
-    cell.innerHTML = `<span style="font-size:9px;font-weight:400;opacity:0.6;line-height:1">${lbl}</span><span style="line-height:1${excl?' text-decoration:line-through':''}">${String(s.score ?? '?')}</span>`;
+    const displaySc = String(editedScore(currentId, i, s.score ?? '?'));
+    cell.innerHTML = `<span style="font-size:9px;font-weight:400;opacity:0.6;line-height:1">${lbl}</span><span style="line-height:1${excl?' text-decoration:line-through':''}">${displaySc}</span>`;
     cell.style.flexDirection = 'column';
     cell.style.gap = '1px';
     cell.style.height = '36px';
@@ -2060,7 +2180,9 @@ function renderTable() {
 
   // Scored shots after
   html += shots.map((s,i) => {
-    const sc=String(s.score??'?');
+    const rawSc = String(s.score??'?');
+    const sc = editedScore(currentId, i, rawSc);
+    const scEdited = sc !== rawSc;
     const lbl = s.display_text != null ? String(s.display_text) : String(i+1);
     const fps = resolvedFps(s, i);
     const src = resolvedFpsSource(s, i);
@@ -2075,9 +2197,12 @@ function renderTable() {
     const exclTitle = excl ? 'Re-include shot' : 'Exclude shot';
     const thetaDeg = s.theta != null ? (s.theta * 180 / Math.PI).toFixed(2) : '-';
     const thetaCol = s.theta != null ? (Math.abs(s.theta * 180 / Math.PI) > 3 ? '#e03030' : Math.abs(s.theta * 180 / Math.PI) > 1.5 ? '#e8a020' : 'var(--muted)') : 'var(--muted)';
+    const scoreCell = editMode
+      ? `<input value="${sc}" onclick="event.stopPropagation()" onchange="commitScoreEdit('${currentId}', ${i}, this.value); renderTable(); renderScoreStrip();" style="width:34px;background:var(--bg);border:1px solid var(--accent);border-radius:4px;color:var(--accent);font-size:12px;font-weight:700;text-align:center;padding:2px" title="Edit score">`
+      : `<span class="sc-pill" style="${scEdited?'outline:2px solid var(--accent2)':''}" title="${scEdited?'Edited (was '+rawSc+')':''}">${sc}</span>`;
     return `<tr class="${excl?'excluded':''}" onclick="highlightShot(${i})">
       <td style="color:var(--muted);font-weight:600">${lbl}</td>
-      <td><span class="sc-pill">${sc}</span></td>
+      <td>${scoreCell}</td>
       <td style="color:var(--muted);font-size:11px">${interval}</td>
       <td>${fpsCell}</td>
       <td>${s.x!=null?s.x.toFixed(1):'-'}</td>
@@ -2376,7 +2501,9 @@ let rt;
 window.addEventListener('resize', () => { clearTimeout(rt); rt=setTimeout(()=>{ if(currentId) drawTarget(); },120); });
 
 // Auto-load on startup
-autoLoadSM();
+// Load edits then auto-load data
+loadEditsFromStorage();
+loadEditsFromGitHub().then(() => autoLoadSM());
 </script>
 <script>
 if ('serviceWorker' in navigator) {
