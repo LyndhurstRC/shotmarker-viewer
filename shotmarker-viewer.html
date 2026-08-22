@@ -548,7 +548,7 @@ async function loadEditsFromGitHub() {
 function editedName(id, rawName) {
   return (edits[id] && edits[id].name != null) ? edits[id].name : rawName;
 }
-// Apply an override to a shot's score OK
+// Apply an override to a shot's score
 function editedScore(id, shotIndex, rawScore) {
   if (edits[id] && edits[id].scores && edits[id].scores[shotIndex] != null) {
     return edits[id].scores[shotIndex];
